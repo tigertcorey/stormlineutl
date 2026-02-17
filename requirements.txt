@@ -1,0 +1,18 @@
+# Stormline UTL Bot - Python Dependencies
+# Pin versions for reproducible builds
+
+# Telegram Bot Framework (async version)
+python-telegram-bot==20.7
+
+# AI Model SDKs
+anthropic==0.18.1
+openai==1.12.0
+
+# Configuration and environment
+python-dotenv==1.0.1
+
+# HTTP client for async operations
+aiohttp==3.13.3
+
+# Logging and utilities
+colorama==0.4.6
