@@ -1,0 +1,31 @@
+version: '3.8'
+
+services:
+  stormline-bot:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: stormline-utl-bot
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      - ./logs:/app/logs
+    environment:
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - MAX_HISTORY_LENGTH=${MAX_HISTORY_LENGTH:-10}
+      - MAX_MESSAGE_LENGTH=${MAX_MESSAGE_LENGTH:-4000}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import sys; sys.exit(0)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 5s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
