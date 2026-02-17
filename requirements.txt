@@ -12,7 +12,7 @@ openai==1.12.0
 python-dotenv==1.0.1
 
 # HTTP client for async operations
-aiohttp==3.9.3
+aiohttp==3.13.3
 
 # Logging and utilities
 colorama==0.4.6
