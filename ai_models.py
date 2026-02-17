@@ -57,11 +57,16 @@ class ClaudeModel:
             
             logger.debug(f"Sending request to Claude with {len(messages)} messages")
             
-            # Call Claude API (synchronous, but wrapped in async function)
-            response = self.client.messages.create(
-                model=self.model,
-                max_tokens=4096,
-                messages=messages
+            # Call Claude API in thread pool to avoid blocking event loop
+            import asyncio
+            loop = asyncio.get_event_loop()
+            response = await loop.run_in_executor(
+                None,
+                lambda: self.client.messages.create(
+                    model=self.model,
+                    max_tokens=4096,
+                    messages=messages
+                )
             )
             
             # Extract text from response
@@ -260,14 +265,19 @@ class MultiModelOrchestrator:
         Returns:
             Synthesized response
         """
+        # Truncate responses for synthesis to avoid token limits
+        max_synthesis_length = 2000
+        claude_truncated = truncate_text(claude_response, max_synthesis_length)
+        gpt_truncated = truncate_text(gpt_response, max_synthesis_length)
+        
         synthesis_prompt = f"""You are a synthesis AI. Given a user question and two AI responses, 
 create a single, comprehensive answer that combines the best insights from both responses.
 
 User Question: {original_message}
 
-Claude's Response: {claude_response}
+Claude's Response: {claude_truncated}
 
-GPT-4's Response: {gpt_response}
+GPT-4's Response: {gpt_truncated}
 
 Provide a synthesized answer that:
 1. Combines the strongest points from both responses

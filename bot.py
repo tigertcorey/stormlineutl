@@ -41,7 +41,10 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     logger.info(f"User {user.id} ({user.username}) started the bot")
     
-    welcome_message = f"""👋 Welcome to **Stormline UTL Bot**, {user.first_name}!
+    # Escape special characters in user's first name for Markdown
+    safe_first_name = user.first_name.replace('*', '\\*').replace('_', '\\_').replace('[', '\\[').replace('`', '\\`')
+    
+    welcome_message = f"""👋 Welcome to **Stormline UTL Bot**, {safe_first_name}!
 
 I'm a multi-AI assistant powered by Claude 3.5 Sonnet and GPT-4. I can help you with questions, analysis, coding, writing, and more!
 
