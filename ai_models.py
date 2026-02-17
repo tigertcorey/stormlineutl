@@ -188,6 +188,9 @@ class ClaudeModel:
             
         Returns:
             MIME type string
+            
+        Raises:
+            Exception: If image format cannot be detected
         """
         # Check magic bytes for common formats
         if image_data.startswith(b'\xff\xd8\xff'):
@@ -196,11 +199,11 @@ class ClaudeModel:
             return 'image/png'
         elif image_data.startswith(b'GIF87a') or image_data.startswith(b'GIF89a'):
             return 'image/gif'
-        elif image_data.startswith(b'RIFF') and image_data[8:12] == b'WEBP':
+        elif image_data.startswith(b'RIFF') and len(image_data) > 12 and image_data[8:12] == b'WEBP':
             return 'image/webp'
         else:
-            # Default to JPEG if unknown
-            return 'image/jpeg'
+            # Raise exception for unknown formats
+            raise Exception("Unable to detect image format. Please ensure you're uploading a valid JPEG, PNG, GIF, or WebP image.")
 
 
 class GPTModel:
