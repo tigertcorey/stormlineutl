@@ -5,7 +5,8 @@ Provides helper functions for logging, error handling, and message formatting.
 
 import logging
 import asyncio
-from typing import Optional, Callable, Any
+import io
+from typing import Optional, Callable, Any, List
 from functools import wraps
 
 logger = logging.getLogger(__name__)
@@ -181,3 +182,63 @@ def truncate_text(text: str, max_length: int = 4000, suffix: str = "...") -> str
         return text
     
     return text[:max_length - len(suffix)] + suffix
+
+
+def pdf_to_images(pdf_bytes: bytes, max_pages: int = 10) -> List[bytes]:
+    """
+    Convert PDF pages to images.
+    
+    Args:
+        pdf_bytes: PDF file bytes
+        max_pages: Maximum pages to convert
+        
+    Returns:
+        List of image bytes (one per page)
+        
+    Raises:
+        Exception: If PDF conversion fails
+    """
+    try:
+        import fitz  # PyMuPDF
+        from PIL import Image
+        
+        images = []
+        
+        # Open PDF from bytes
+        pdf_document = fitz.open(stream=pdf_bytes, filetype="pdf")
+        
+        # Limit to max_pages
+        num_pages = min(len(pdf_document), max_pages)
+        
+        logger.info(f"Converting {num_pages} pages from PDF to images")
+        
+        for page_num in range(num_pages):
+            # Get page
+            page = pdf_document[page_num]
+            
+            # Render page to image (matrix scales the image)
+            # Use 2.0 zoom for good quality
+            mat = fitz.Matrix(2.0, 2.0)
+            pix = page.get_pixmap(matrix=mat)
+            
+            # Convert to PIL Image
+            img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
+            
+            # Save to bytes
+            img_bytes = io.BytesIO()
+            img.save(img_bytes, format='PNG')
+            images.append(img_bytes.getvalue())
+            
+            logger.debug(f"Converted page {page_num + 1}/{num_pages}")
+        
+        pdf_document.close()
+        
+        logger.info(f"Successfully converted {len(images)} PDF pages to images")
+        return images
+        
+    except ImportError as e:
+        logger.error(f"Required library not found for PDF processing: {e}")
+        raise Exception("PDF processing libraries not available")
+    except Exception as e:
+        logger.error(f"Error converting PDF to images: {e}")
+        raise Exception(f"Failed to process PDF: {str(e)}")
