@@ -30,6 +30,7 @@ logger = logging.getLogger(__name__)
 
 # Constants
 MAX_PDF_TEXT_LENGTH = 10000  # Maximum characters to extract from PDF
+PDF_TRUNCATION_MESSAGE = "\n\n[Document truncated due to length...]"
 
 # Initialize components
 orchestrator = MultiModelOrchestrator()
@@ -368,7 +369,7 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
             
             # Truncate PDF text if too long
             if len(pdf_text) > MAX_PDF_TEXT_LENGTH:
-                pdf_text = pdf_text[:MAX_PDF_TEXT_LENGTH] + "\n\n[Document truncated due to length...]"
+                pdf_text = pdf_text[:MAX_PDF_TEXT_LENGTH] + PDF_TRUNCATION_MESSAGE
             
             # Create prompt for AI
             prompt = f"{user_question}\n\nDocument content:\n{pdf_text}"
