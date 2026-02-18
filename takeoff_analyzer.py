@@ -5,7 +5,7 @@ Analyzes construction plans for storm, water, sewer, and FDC systems using AI.
 
 import logging
 import re
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Any
 from ai_models import MultiModelOrchestrator
 
 logger = logging.getLogger(__name__)
@@ -34,7 +34,7 @@ class TakeoffAnalyzer:
         pdf_text: str,
         pdf_metadata: Dict[str, str],
         systems: Optional[List[str]] = None
-    ) -> Dict[str, any]:
+    ) -> Dict[str, Any]:
         """
         Analyze construction plans and perform takeoff.
         
@@ -190,7 +190,7 @@ Format your response clearly with sections and bullet points for easy reading.""
     
     def _generate_summary(
         self,
-        text_patterns: Dict[str, any],
+        text_patterns: Dict[str, Any],
         ai_analysis: str
     ) -> str:
         """
@@ -219,7 +219,7 @@ Format your response clearly with sections and bullet points for easy reading.""
         
         return '\n'.join(summary_lines)
     
-    def format_takeoff_response(self, analysis: Dict[str, any]) -> str:
+    def format_takeoff_response(self, analysis: Dict[str, Any]) -> str:
         """
         Format takeoff analysis for Telegram response.
         

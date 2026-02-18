@@ -6,7 +6,7 @@ Handles PDF text extraction, image extraction, and OCR for construction plans.
 import logging
 import tempfile
 import os
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Any
 from pathlib import Path
 import PyPDF2
 from pdf2image import convert_from_path
@@ -23,7 +23,7 @@ class PDFProcessor:
         """Initialize PDF processor."""
         logger.info("PDF processor initialized")
     
-    async def process_pdf(self, pdf_path: str) -> Dict[str, any]:
+    async def process_pdf(self, pdf_path: str) -> Dict[str, Any]:
         """
         Process a PDF file and extract text and images.
         
