@@ -4,6 +4,7 @@ Handles interactions with Anthropic Claude and OpenAI GPT-4 APIs.
 """
 
 import logging
+import base64
 from typing import Optional, List, Dict
 import anthropic
 import openai
@@ -84,6 +85,125 @@ class ClaudeModel:
         except Exception as e:
             logger.error(f"Unexpected error calling Claude: {e}")
             raise
+    
+    @retry_with_backoff(max_retries=3, base_delay=1.0)
+    async def analyze_image(
+        self,
+        image_data: bytes,
+        prompt: str,
+        conversation_history: Optional[List[Dict]] = None
+    ) -> str:
+        """
+        Analyze an image using Claude's vision capabilities.
+        
+        Args:
+            image_data: Image bytes
+            prompt: Analysis prompt
+            conversation_history: Optional conversation history
+            
+        Returns:
+            Claude's analysis
+            
+        Raises:
+            Exception: If API call fails or image format is unsupported
+        """
+        try:
+            # Validate image size (20MB limit)
+            max_size = 20 * 1024 * 1024  # 20MB
+            if len(image_data) > max_size:
+                raise Exception(f"Image size ({len(image_data)} bytes) exceeds maximum allowed size (20MB)")
+            
+            # Detect image format
+            image_format = self._detect_image_format(image_data)
+            if image_format not in ['image/jpeg', 'image/png', 'image/gif', 'image/webp']:
+                raise Exception(f"Unsupported image format. Please use JPEG, PNG, GIF, or WebP.")
+            
+            # Encode image to base64
+            image_base64 = base64.standard_b64encode(image_data).decode('utf-8')
+            
+            logger.debug(f"Analyzing image with format {image_format}, size {len(image_data)} bytes")
+            
+            # Build messages list
+            messages = []
+            
+            if conversation_history:
+                # Add conversation history (text only)
+                messages.extend(conversation_history)
+            
+            # Add current message with image
+            messages.append({
+                "role": "user",
+                "content": [
+                    {
+                        "type": "image",
+                        "source": {
+                            "type": "base64",
+                            "media_type": image_format,
+                            "data": image_base64
+                        }
+                    },
+                    {
+                        "type": "text",
+                        "text": prompt
+                    }
+                ]
+            })
+            
+            logger.debug(f"Sending vision request to Claude with {len(messages)} messages")
+            
+            # Call Claude Vision API in thread pool to avoid blocking event loop
+            import asyncio
+            loop = asyncio.get_event_loop()
+            response = await loop.run_in_executor(
+                None,
+                lambda: self.client.messages.create(
+                    model=self.model,
+                    max_tokens=4096,
+                    messages=messages
+                )
+            )
+            
+            # Extract text from response
+            result = response.content[0].text
+            logger.info(f"Received vision analysis from Claude ({len(result)} chars)")
+            
+            return truncate_text(result, config.max_message_length)
+            
+        except anthropic.RateLimitError as e:
+            logger.error(f"Claude rate limit exceeded: {e}")
+            raise Exception("Rate limit exceeded. Please try again later.")
+        except anthropic.APIError as e:
+            logger.error(f"Claude API error: {e}")
+            raise Exception(f"Claude API error: {str(e)}")
+        except Exception as e:
+            logger.error(f"Unexpected error in vision analysis: {e}")
+            raise
+    
+    def _detect_image_format(self, image_data: bytes) -> str:
+        """
+        Detect image format from bytes.
+        
+        Args:
+            image_data: Image bytes
+            
+        Returns:
+            MIME type string
+            
+        Raises:
+            Exception: If image format cannot be detected
+        """
+        # Check magic bytes for common formats
+        if image_data.startswith(b'\xff\xd8\xff'):
+            return 'image/jpeg'
+        elif image_data.startswith(b'\x89PNG\r\n\x1a\n'):
+            return 'image/png'
+        elif image_data.startswith(b'GIF87a') or image_data.startswith(b'GIF89a'):
+            return 'image/gif'
+        elif image_data.startswith(b'RIFF') and len(image_data) > 12 and image_data[8:12] == b'WEBP':
+            return 'image/webp'
+        else:
+            # Raise exception for unknown formats
+            raise Exception("Unable to detect image format. Please ensure you're uploading a valid JPEG, PNG, GIF, or WebP image.")
 
 
 class GPTModel:

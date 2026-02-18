@@ -16,3 +16,8 @@ aiohttp==3.13.3
 
 # Logging and utilities
 colorama==0.4.6
+
+# PDF and image processing
+pdf2image>=1.16.0
+Pillow>=10.0.0
+PyMuPDF>=1.23.0
