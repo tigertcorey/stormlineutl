@@ -19,8 +19,11 @@ from utils import (
     sanitize_input,
     format_synthesized_response,
     format_error_message,
-    ConversationHistory
+    ConversationHistory,
+    extract_text_from_pdf
 )
+import tempfile
+import os
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -54,6 +57,9 @@ I'm a multi-AI assistant powered by Claude 3.5 Sonnet and GPT-4. I can help you 
 /claude <message> - Query Claude AI only
 /gpt <message> - Query GPT-4 only
 /both <message> - Query both AIs and get a synthesized response
+
+**PDF Document Analysis:**
+📄 Upload any PDF document and I'll analyze it for you! Just send the PDF file directly, or add a caption with specific questions.
 
 **Default Behavior:**
 Just send me any message, and I'll automatically query both AI models and provide you with a comprehensive synthesized answer along with individual perspectives!
@@ -94,12 +100,22 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 🔹 `/both <message>` - Query both models and get synthesized response
    Example: `/both What is the future of AI?`
 
+**PDF Document Analysis:**
+📄 Upload any PDF document to get it analyzed:
+   1. Click the attachment icon in Telegram
+   2. Select your PDF file
+   3. Optionally add a caption with specific questions
+   4. Send it to me!
+
+I'll extract the text and provide comprehensive analysis using both AI models.
+
 **Default Behavior:**
 Send any message without a command, and I'll automatically use `/both` mode to give you the best possible answer!
 
 **Features:**
 ✅ Conversation history tracking (last 10 messages)
 ✅ Multi-model consensus for better answers
+✅ PDF document scanning and analysis
 ✅ Graceful fallback if one model is unavailable
 ✅ Smart error handling and retry logic
 
@@ -113,6 +129,7 @@ When using both models, you'll receive:
 - Be specific in your questions for best results
 - Use `/claude` or `/gpt` if you prefer a specific model's style
 - Conversation history helps with follow-up questions
+- Upload PDFs for document analysis and insights
 
 Need more help? Just ask! 💬"""
     
@@ -304,6 +321,87 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(format_error_message(e))
 
 
+async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    Handle document uploads (PDF files).
+    
+    Args:
+        update: Telegram update object
+        context: Callback context
+    """
+    user = update.effective_user
+    document = update.message.document
+    
+    # Check if it's a PDF file
+    if not document.file_name.lower().endswith('.pdf'):
+        await update.message.reply_text(
+            "⚠️ Currently, I only support PDF files. Please upload a PDF document."
+        )
+        return
+    
+    logger.info(f"User {user.id} uploaded PDF: {document.file_name}")
+    
+    # Send processing indicator
+    await update.message.reply_text("📄 Processing your PDF document...")
+    await update.message.chat.send_action(action="typing")
+    
+    try:
+        # Download the PDF file
+        file = await context.bot.get_file(document.file_id)
+        
+        # Create temporary file
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.pdf') as tmp_file:
+            tmp_path = tmp_file.name
+        
+        try:
+            # Download PDF to temporary file
+            await file.download_to_drive(tmp_path)
+            
+            # Extract text from PDF
+            pdf_text = await extract_text_from_pdf(tmp_path)
+            
+            # Get any caption/question from the user
+            user_question = update.message.caption or "Please analyze this document and provide a summary."
+            
+            # Truncate PDF text if too long (keep first 10000 chars)
+            if len(pdf_text) > 10000:
+                pdf_text = pdf_text[:10000] + "\n\n[Document truncated due to length...]"
+            
+            # Create prompt for AI
+            prompt = f"{user_question}\n\nDocument content:\n{pdf_text}"
+            
+            # Get conversation history
+            history = conversation_history.get_history(user.id)
+            
+            # Query both models
+            synthesized, claude_resp, gpt_resp = await orchestrator.query_both(
+                prompt, history
+            )
+            
+            # Store in conversation history
+            conversation_history.add_message(user.id, 'user', f"[Uploaded PDF: {document.file_name}] {user_question}")
+            conversation_history.add_message(user.id, 'assistant', synthesized)
+            
+            # Format and send response
+            response = f"📄 **Analysis of {document.file_name}:**\n\n"
+            response += format_synthesized_response(synthesized, claude_resp, gpt_resp)
+            
+            await update.message.reply_text(response, parse_mode='Markdown')
+            
+        finally:
+            # Clean up temporary file
+            if os.path.exists(tmp_path):
+                os.remove(tmp_path)
+                logger.debug(f"Cleaned up temporary file: {tmp_path}")
+        
+    except Exception as e:
+        logger.error(f"Error processing PDF: {e}")
+        await update.message.reply_text(
+            "⚠️ Sorry, I encountered an error processing your PDF. "
+            "Please make sure it's a valid PDF file and try again."
+        )
+
+
 async def error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
     Handle errors in the bot.
@@ -343,6 +441,12 @@ def main():
     application.add_handler(MessageHandler(
         filters.TEXT & ~filters.COMMAND,
         handle_message
+    ))
+    
+    # Add document handler for PDF files
+    application.add_handler(MessageHandler(
+        filters.Document.ALL,
+        handle_document
     ))
     
     # Add error handler

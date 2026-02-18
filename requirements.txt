@@ -16,3 +16,6 @@ aiohttp==3.13.3
 
 # Logging and utilities
 colorama==0.4.6
+
+# PDF processing
+pypdf==5.1.0
