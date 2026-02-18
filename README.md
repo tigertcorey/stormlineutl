@@ -17,6 +17,15 @@ A production-ready, multi-AI Telegram bot that integrates **Claude 3.5 Sonnet** 
 - **Intelligent Synthesis**: Automatically combines the best aspects of both AI responses
 - **Conversation History**: Maintains context across your conversation (last 10 messages)
 - **Graceful Degradation**: Automatically falls back to a single model if one is unavailable
+- **Construction Takeoff**: Analyze PDF construction plans for storm, water, sewer, and FDC systems
+
+### 🏗️ Construction Takeoff Features
+- **PDF Processing**: Upload construction plans in PDF format
+- **OCR Support**: Automatically handles scanned/image-based PDFs
+- **AI-Powered Analysis**: Uses Claude AI to analyze plans and extract quantities
+- **Multi-System Analysis**: Analyzes storm drainage, water, sewer, and FDC (Fire Department Connection) systems
+- **Detailed Reports**: Provides comprehensive takeoff with quantities, materials, and specifications
+- **Pattern Recognition**: Identifies pipe sizes, materials, and system components automatically
 
 ### 🛠️ Technical Features
 - **Async Architecture**: Built with Python's async/await for optimal performance
@@ -41,6 +50,16 @@ A production-ready, multi-AI Telegram bot that integrates **Claude 3.5 Sonnet** 
   - [Telegram Bot Token](https://core.telegram.org/bots#6-botfather) from @BotFather
   - [Anthropic API Key](https://console.anthropic.com/) for Claude
   - [OpenAI API Key](https://platform.openai.com/) for GPT-4
+
+### For PDF Takeoff Features
+- **Poppler** (for PDF to image conversion)
+  - Ubuntu/Debian: `sudo apt-get install poppler-utils`
+  - macOS: `brew install poppler`
+  - Windows: Download from [Poppler for Windows](http://blog.alivate.com.au/poppler-windows/)
+- **Tesseract OCR** (for scanned PDF processing)
+  - Ubuntu/Debian: `sudo apt-get install tesseract-ocr`
+  - macOS: `brew install tesseract`
+  - Windows: Download from [Tesseract at UB Mannheim](https://github.com/UB-Mannheim/tesseract/wiki)
 
 ### System Requirements
 - Ubuntu 20.04+ (or any Linux distribution)
@@ -141,6 +160,7 @@ MAX_MESSAGE_LENGTH=4000           # Maximum message length
 | `/claude <message>` | Query Claude AI only | `/claude Explain quantum computing` |
 | `/gpt <message>` | Query GPT-4 only | `/gpt What is machine learning?` |
 | `/both <message>` | Query both models with synthesis | `/both Compare Python and JavaScript` |
+| `/takeoff` | Analyze construction plan PDF for takeoff | Upload PDF, then `/takeoff` |
 | `<any message>` | Default: query both models | `How does blockchain work?` |
 
 ### Example Interactions
@@ -166,6 +186,27 @@ Claude sees AI evolving through...
 
 🧠 GPT-4's perspective:
 GPT-4 emphasizes the importance of...
+```
+
+**Construction Takeoff:**
+```
+You: [Upload PDF of construction plans]
+
+You: /takeoff
+
+Bot: ⏳ Processing your construction plans...
+
+Bot: 📋 Construction Takeoff Analysis
+
+**Project:** CFA Edmund Plans
+**Systems:** STORM, WATER, SEWER, FDC
+
+📊 Takeoff Summary
+- STORM: 15 references found
+  Materials: PVC, HDPE
+- WATER: 8 references found
+  Materials: PVC, ductile iron
+...
 ```
 
 ### Response Format
@@ -221,6 +262,8 @@ stormlineutl/
 ├── ai_models.py          # AI model integrations (Claude, GPT-4)
 ├── config.py             # Configuration management
 ├── utils.py              # Helper functions and utilities
+├── pdf_processor.py      # PDF processing and OCR
+├── takeoff_analyzer.py   # Construction takeoff analysis
 ├── requirements.txt      # Python dependencies
 ├── Dockerfile           # Docker container definition
 ├── docker-compose.yml   # Docker Compose configuration
@@ -307,15 +350,17 @@ The modular architecture makes it easy to extend:
 
 Future features planned:
 
-- [ ] **PlanSwift Integration**: COM API integration for construction takeoff
+- [x] **Construction Takeoff**: PDF analysis for storm, water, sewer, and FDC systems ✅
+- [ ] **PlanSwift Integration**: COM API integration for advanced construction takeoff
 - [ ] **SMS/Twilio Support**: SMS interface via Twilio
 - [ ] **Web Dashboard**: Monitor bot usage and analytics
 - [ ] **Database Integration**: Persistent conversation history with PostgreSQL
 - [ ] **Custom GPT Actions**: RESTful API endpoints for ChatGPT plugins
 - [ ] **Multi-language Support**: Internationalization (i18n)
 - [ ] **Voice Messages**: Support for audio input/output
-- [ ] **Image Analysis**: Integration with vision models
+- [ ] **Image Analysis**: Integration with vision models for plan markup
 - [ ] **Admin Panel**: User management and bot configuration
+- [ ] **Cost Estimation**: Automatic cost calculation based on takeoff quantities
 
 ## 📄 License
 

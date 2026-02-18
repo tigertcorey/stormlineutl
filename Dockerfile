@@ -20,6 +20,12 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
+# Install runtime dependencies for PDF processing
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    poppler-utils \
+    tesseract-ocr \
+    && rm -rf /var/lib/apt/lists/*
+
 # Copy Python dependencies from builder
 COPY --from=builder /root/.local /root/.local
 
@@ -28,6 +34,8 @@ COPY bot.py .
 COPY ai_models.py .
 COPY config.py .
 COPY utils.py .
+COPY pdf_processor.py .
+COPY takeoff_analyzer.py .
 
 # Create logs directory
 RUN mkdir -p /app/logs
