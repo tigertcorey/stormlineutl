@@ -27,6 +27,9 @@ from takeoff_analyzer import TakeoffAnalyzer
 # Configure logging
 logger = logging.getLogger(__name__)
 
+# Constants
+TELEGRAM_MAX_MESSAGE_LENGTH = 4096  # Maximum characters per Telegram message
+
 # Initialize components
 orchestrator = MultiModelOrchestrator()
 conversation_history = ConversationHistory(max_length=config.max_history_length)
@@ -454,9 +457,12 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await processing_msg.delete()
             
             # Send analysis results (may need to split if too long)
-            if len(response) > 4096:
+            if len(response) > TELEGRAM_MAX_MESSAGE_LENGTH:
                 # Split into chunks
-                chunks = [response[i:i+4096] for i in range(0, len(response), 4096)]
+                chunks = [
+                    response[i:i+TELEGRAM_MAX_MESSAGE_LENGTH] 
+                    for i in range(0, len(response), TELEGRAM_MAX_MESSAGE_LENGTH)
+                ]
                 for chunk in chunks:
                     await update.message.reply_text(chunk, parse_mode='Markdown')
             else:

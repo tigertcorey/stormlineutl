@@ -17,6 +17,9 @@ class TakeoffAnalyzer:
     # System types we're analyzing
     SYSTEM_TYPES = ['storm', 'water', 'sewer', 'fdc']
     
+    # Maximum text length for AI analysis (to stay within token limits)
+    MAX_AI_TEXT_LENGTH = 8000
+    
     # Common units and patterns
     PIPE_PATTERNS = [
         r'(\d+)["\']?\s*(?:inch|in)?\s*(?:pipe|line)',
@@ -133,9 +136,8 @@ class TakeoffAnalyzer:
             AI analysis text
         """
         # Truncate text if too long (to stay within token limits)
-        max_text_length = 8000
-        if len(pdf_text) > max_text_length:
-            pdf_text = pdf_text[:max_text_length] + "\n... [text truncated]"
+        if len(pdf_text) > self.MAX_AI_TEXT_LENGTH:
+            pdf_text = pdf_text[:self.MAX_AI_TEXT_LENGTH] + "\n... [text truncated]"
         
         prompt = f"""You are a construction takeoff specialist analyzing construction plans. 
 Please analyze the following construction plan document and provide a detailed takeoff for these systems: {', '.join(systems)}.

@@ -19,6 +19,12 @@ logger = logging.getLogger(__name__)
 class PDFProcessor:
     """Handles PDF processing for construction plan takeoff."""
     
+    # Constants for PDF processing
+    MIN_TEXT_LENGTH_THRESHOLD = 100  # Minimum characters to consider PDF has extractable text
+    MIN_OCR_TEXT_LENGTH = 50  # Minimum characters for OCR to be considered successful
+    OCR_DPI = 200  # DPI for converting PDF pages to images for OCR
+    OCR_MAX_PAGES = 3  # Maximum pages to process with OCR (to limit processing time)
+    
     def __init__(self):
         """Initialize PDF processor."""
         logger.info("PDF processor initialized")
@@ -59,7 +65,7 @@ class PDFProcessor:
             
             # Determine if PDF has extractable text
             text_length = len(result['text'].strip())
-            result['has_text'] = text_length > 100
+            result['has_text'] = text_length > self.MIN_TEXT_LENGTH_THRESHOLD
             result['is_scanned'] = not result['has_text']
             
             logger.info(
@@ -72,7 +78,7 @@ class PDFProcessor:
                 logger.info("PDF appears to be scanned, attempting OCR...")
                 ocr_text = await self._perform_ocr(pdf_path)
                 result['text'] += f"\n\n--- OCR Extracted Text ---\n{ocr_text}"
-                result['has_text'] = len(ocr_text.strip()) > 50
+                result['has_text'] = len(ocr_text.strip()) > self.MIN_OCR_TEXT_LENGTH
             
             return result
             
@@ -91,8 +97,13 @@ class PDFProcessor:
             Extracted text from OCR
         """
         try:
-            # Convert PDF to images
-            images = convert_from_path(pdf_path, dpi=200, first_page=1, last_page=3)
+            # Convert PDF to images (limit to first few pages to avoid excessive processing)
+            images = convert_from_path(
+                pdf_path, 
+                dpi=self.OCR_DPI, 
+                first_page=1, 
+                last_page=self.OCR_MAX_PAGES
+            )
             
             ocr_text = ""
             for i, image in enumerate(images):
