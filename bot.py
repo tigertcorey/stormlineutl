@@ -28,6 +28,9 @@ import os
 # Configure logging
 logger = logging.getLogger(__name__)
 
+# Constants
+MAX_PDF_TEXT_LENGTH = 10000  # Maximum characters to extract from PDF
+
 # Initialize components
 orchestrator = MultiModelOrchestrator()
 conversation_history = ConversationHistory(max_length=config.max_history_length)
@@ -363,9 +366,9 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
             # Get any caption/question from the user
             user_question = update.message.caption or "Please analyze this document and provide a summary."
             
-            # Truncate PDF text if too long (keep first 10000 chars)
-            if len(pdf_text) > 10000:
-                pdf_text = pdf_text[:10000] + "\n\n[Document truncated due to length...]"
+            # Truncate PDF text if too long
+            if len(pdf_text) > MAX_PDF_TEXT_LENGTH:
+                pdf_text = pdf_text[:MAX_PDF_TEXT_LENGTH] + "\n\n[Document truncated due to length...]"
             
             # Create prompt for AI
             prompt = f"{user_question}\n\nDocument content:\n{pdf_text}"

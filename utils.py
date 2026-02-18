@@ -14,6 +14,11 @@ from pypdf import PdfReader
 logger = logging.getLogger(__name__)
 
 
+class PDFProcessingError(Exception):
+    """Custom exception for PDF processing errors."""
+    pass
+
+
 def sanitize_input(text: str, max_length: int = 4000) -> str:
     """
     Sanitize user input to prevent injection attacks and limit length.
@@ -197,7 +202,7 @@ async def extract_text_from_pdf(file_path: str) -> str:
         Extracted text content
         
     Raises:
-        Exception: If PDF extraction fails
+        PDFProcessingError: If PDF extraction fails
     """
     try:
         logger.info(f"Extracting text from PDF: {file_path}")
@@ -215,7 +220,8 @@ async def extract_text_from_pdf(file_path: str) -> str:
         
     except Exception as e:
         logger.error(f"Failed to extract text from PDF: {e}")
-        raise Exception(f"Failed to process PDF: {str(e)}")
+        raise PDFProcessingError(f"Failed to process PDF: {str(e)}") from e
+
 
 
 def _extract_pdf_sync(file_path: str) -> str:
@@ -241,6 +247,6 @@ def _extract_pdf_sync(file_path: str) -> str:
             text_parts.append(f"--- Page {page_num} ---\n[Could not extract text from this page]\n")
     
     if not text_parts:
-        raise Exception("No text could be extracted from the PDF")
+        raise PDFProcessingError("No text could be extracted from the PDF")
     
     return "\n".join(text_parts)
