@@ -57,3 +57,7 @@ htmlcov/
 tmp/
 temp/
 *.tmp
+
+# Generated conversion files
+edmund_converted_to_stormline_v3.txt
+edmund_converted_to_stormline_v3.json
