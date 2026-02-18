@@ -458,13 +458,16 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await processing_msg.delete()
             
             # Send analysis results (split on paragraph breaks if too long)
-            if len(response) > TELEGRAM_MAX_MESSAGE_LENGTH:
+            # Use a safety margin to account for Markdown formatting overhead
+            SAFE_MESSAGE_LENGTH = TELEGRAM_MAX_MESSAGE_LENGTH - 200
+            
+            if len(response) > SAFE_MESSAGE_LENGTH:
                 # Split on paragraph breaks to preserve formatting
                 chunks = []
                 current_chunk = ""
                 
                 for line in response.split('\n'):
-                    if len(current_chunk) + len(line) + 1 > TELEGRAM_MAX_MESSAGE_LENGTH:
+                    if len(current_chunk) + len(line) + 1 > SAFE_MESSAGE_LENGTH:
                         chunks.append(current_chunk)
                         current_chunk = line + '\n'
                     else:
@@ -474,9 +477,19 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     chunks.append(current_chunk)
                 
                 for chunk in chunks:
-                    await update.message.reply_text(chunk, parse_mode='Markdown')
+                    try:
+                        await update.message.reply_text(chunk, parse_mode='Markdown')
+                    except Exception as e:
+                        # Fallback to plain text if Markdown parsing fails
+                        logger.warning(f"Markdown parsing failed, sending as plain text: {e}")
+                        await update.message.reply_text(chunk)
             else:
-                await update.message.reply_text(response, parse_mode='Markdown')
+                try:
+                    await update.message.reply_text(response, parse_mode='Markdown')
+                except Exception as e:
+                    # Fallback to plain text if Markdown parsing fails
+                    logger.warning(f"Markdown parsing failed, sending as plain text: {e}")
+                    await update.message.reply_text(response)
             
             logger.info(f"Takeoff analysis completed for user {user.id}")
             

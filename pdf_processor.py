@@ -160,6 +160,13 @@ class PDFProcessor:
             safe_filename = os.path.basename(filename)
             # Remove any potentially dangerous characters
             safe_filename = "".join(c for c in safe_filename if c.isalnum() or c in ('_', '-', '.'))
+            # Prevent multiple consecutive dots and leading dots
+            while '..' in safe_filename:
+                safe_filename = safe_filename.replace('..', '.')
+            safe_filename = safe_filename.lstrip('.')
+            # Ensure filename is not empty after sanitization
+            if not safe_filename:
+                safe_filename = "document.pdf"
             
             # Create temp directory if it doesn't exist
             temp_dir = tempfile.gettempdir()
