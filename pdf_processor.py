@@ -146,7 +146,7 @@ class PDFProcessor:
     
     def save_uploaded_file(self, file_content: bytes, filename: str) -> str:
         """
-        Save uploaded file to temporary directory.
+        Save uploaded file to temporary directory with sanitized filename.
         
         Args:
             file_content: Binary content of the file
@@ -156,9 +156,14 @@ class PDFProcessor:
             Path to saved file
         """
         try:
+            # Sanitize filename to prevent path traversal attacks
+            safe_filename = os.path.basename(filename)
+            # Remove any potentially dangerous characters
+            safe_filename = "".join(c for c in safe_filename if c.isalnum() or c in ('_', '-', '.'))
+            
             # Create temp directory if it doesn't exist
             temp_dir = tempfile.gettempdir()
-            file_path = os.path.join(temp_dir, f"stormline_{filename}")
+            file_path = os.path.join(temp_dir, f"stormline_{safe_filename}")
             
             with open(file_path, 'wb') as f:
                 f.write(file_content)

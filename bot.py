@@ -390,8 +390,9 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     document = update.message.document
     
-    # Check if document is a PDF
-    if not document.file_name.lower().endswith('.pdf'):
+    # Note: MIME type is already filtered by the handler at registration
+    # This provides an additional user-friendly message for non-PDF documents
+    if not document.mime_type or document.mime_type != 'application/pdf':
         await update.message.reply_text(
             "⚠️ Please upload a PDF file for takeoff analysis.\n"
             "Use /takeoff command first, then upload your PDF."
@@ -456,13 +457,22 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
             # Delete processing message
             await processing_msg.delete()
             
-            # Send analysis results (may need to split if too long)
+            # Send analysis results (split on paragraph breaks if too long)
             if len(response) > TELEGRAM_MAX_MESSAGE_LENGTH:
-                # Split into chunks
-                chunks = [
-                    response[i:i+TELEGRAM_MAX_MESSAGE_LENGTH] 
-                    for i in range(0, len(response), TELEGRAM_MAX_MESSAGE_LENGTH)
-                ]
+                # Split on paragraph breaks to preserve formatting
+                chunks = []
+                current_chunk = ""
+                
+                for line in response.split('\n'):
+                    if len(current_chunk) + len(line) + 1 > TELEGRAM_MAX_MESSAGE_LENGTH:
+                        chunks.append(current_chunk)
+                        current_chunk = line + '\n'
+                    else:
+                        current_chunk += line + '\n'
+                
+                if current_chunk:
+                    chunks.append(current_chunk)
+                
                 for chunk in chunks:
                     await update.message.reply_text(chunk, parse_mode='Markdown')
             else:
@@ -471,8 +481,10 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
             logger.info(f"Takeoff analysis completed for user {user.id}")
             
         finally:
-            # Clean up temporary file
+            # Clean up temporary file and user state
             pdf_processor.cleanup_file(file_path)
+            if user.id in context.user_data.get('awaiting_pdf', {}):
+                del context.user_data['awaiting_pdf'][user.id]
         
     except Exception as e:
         logger.error(f"Error processing PDF for takeoff: {e}")

@@ -20,6 +20,49 @@ class TakeoffAnalyzer:
     # Maximum text length for AI analysis (to stay within token limits)
     MAX_AI_TEXT_LENGTH = 8000
     
+    # AI prompt template for takeoff analysis
+    TAKEOFF_PROMPT_TEMPLATE = """You are a construction takeoff specialist analyzing construction plans. 
+Please analyze the following construction plan document and provide a detailed takeoff for these systems: {systems}.
+
+Project Information:
+- Title: {title}
+- Pages: {page_count}
+
+Document Content:
+{pdf_text}
+
+Please provide a comprehensive takeoff analysis including:
+
+1. **Storm System** (if applicable):
+   - Pipe sizes and linear footage
+   - Catch basins and inlets
+   - Manholes
+   - Materials specified
+
+2. **Water System** (if applicable):
+   - Water line sizes and lengths
+   - Fire hydrants
+   - Valves and fittings
+   - Materials specified
+
+3. **Sewer System** (if applicable):
+   - Sewer line sizes and lengths
+   - Manholes
+   - Cleanouts
+   - Materials specified
+
+4. **FDC (Fire Department Connection)** (if applicable):
+   - Location and specifications
+   - Connected systems
+   - Materials and accessories
+
+5. **Quantities Summary**:
+   - Major materials and quantities
+   - Labor considerations
+   - Special notes or requirements
+
+Format your response clearly with sections and bullet points for easy reading."""
+    
     # Common units and patterns
     PIPE_PATTERNS = [
         r'(\d+)["\']?\s*(?:inch|in)?\s*(?:pipe|line)',
@@ -139,47 +182,13 @@ class TakeoffAnalyzer:
         if len(pdf_text) > self.MAX_AI_TEXT_LENGTH:
             pdf_text = pdf_text[:self.MAX_AI_TEXT_LENGTH] + "\n... [text truncated]"
         
-        prompt = f"""You are a construction takeoff specialist analyzing construction plans. 
-Please analyze the following construction plan document and provide a detailed takeoff for these systems: {', '.join(systems)}.
-
-Project Information:
-- Title: {pdf_metadata.get('title', 'Unknown')}
-- Pages: {pdf_metadata.get('page_count', 'Unknown')}
-
-Document Content:
-{pdf_text}
-
-Please provide a comprehensive takeoff analysis including:
-
-1. **Storm System** (if applicable):
-   - Pipe sizes and linear footage
-   - Catch basins and inlets
-   - Manholes
-   - Materials specified
-
-2. **Water System** (if applicable):
-   - Water line sizes and lengths
-   - Fire hydrants
-   - Valves and fittings
-   - Materials specified
-
-3. **Sewer System** (if applicable):
-   - Sewer line sizes and lengths
-   - Manholes
-   - Cleanouts
-   - Materials specified
-
-4. **FDC (Fire Department Connection)** (if applicable):
-   - Location and specifications
-   - Connected systems
-   - Materials and accessories
-
-5. **Quantities Summary**:
-   - Major materials and quantities
-   - Labor considerations
-   - Special notes or requirements
-
-Format your response clearly with sections and bullet points for easy reading."""
+        # Format the prompt using the template
+        prompt = self.TAKEOFF_PROMPT_TEMPLATE.format(
+            systems=', '.join(systems),
+            title=pdf_metadata.get('title', 'Unknown'),
+            page_count=pdf_metadata.get('page_count', 'Unknown'),
+            pdf_text=pdf_text
+        )
         
         try:
             # Use Claude for analysis (construction/technical analysis)
