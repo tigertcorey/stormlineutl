@@ -21,6 +21,8 @@ from utils import (
     format_error_message,
     ConversationHistory
 )
+from pdf_processor import PDFProcessor
+from takeoff_analyzer import TakeoffAnalyzer
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -28,6 +30,8 @@ logger = logging.getLogger(__name__)
 # Initialize components
 orchestrator = MultiModelOrchestrator()
 conversation_history = ConversationHistory(max_length=config.max_history_length)
+pdf_processor = PDFProcessor()
+takeoff_analyzer = TakeoffAnalyzer()
 
 
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -54,9 +58,13 @@ I'm a multi-AI assistant powered by Claude 3.5 Sonnet and GPT-4. I can help you 
 /claude <message> - Query Claude AI only
 /gpt <message> - Query GPT-4 only
 /both <message> - Query both AIs and get a synthesized response
+/takeoff - Upload a construction plan PDF for takeoff analysis
 
 **Default Behavior:**
 Just send me any message, and I'll automatically query both AI models and provide you with a comprehensive synthesized answer along with individual perspectives!
+
+**Construction Takeoff:**
+Upload a PDF of construction plans and use /takeoff to analyze storm, water, sewer, and FDC systems!
 
 **Example:**
 `Explain quantum computing in simple terms`
@@ -94,12 +102,19 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 🔹 `/both <message>` - Query both models and get synthesized response
    Example: `/both What is the future of AI?`
 
+🔹 `/takeoff` - Upload construction plans (PDF) for takeoff analysis
+   1. Upload a PDF file of construction plans
+   2. Send /takeoff command
+   3. Receive detailed analysis of storm, water, sewer, and FDC systems
+
 **Default Behavior:**
 Send any message without a command, and I'll automatically use `/both` mode to give you the best possible answer!
 
 **Features:**
 ✅ Conversation history tracking (last 10 messages)
 ✅ Multi-model consensus for better answers
+✅ Construction plan takeoff analysis
+✅ PDF processing with OCR support
 ✅ Graceful fallback if one model is unavailable
 ✅ Smart error handling and retry logic
 
@@ -109,10 +124,18 @@ When using both models, you'll receive:
 - 💡 Claude's unique perspective
 - 🧠 GPT-4's unique perspective
 
+**Construction Takeoff:**
+Upload PDF plans and get automatic quantity takeoff for:
+- Storm drainage systems
+- Water distribution systems
+- Sanitary sewer systems
+- Fire Department Connections (FDC)
+
 **Tips:**
 - Be specific in your questions for best results
 - Use `/claude` or `/gpt` if you prefer a specific model's style
 - Conversation history helps with follow-up questions
+- For construction takeoffs, ensure PDF plans are clear and readable
 
 Need more help? Just ask! 💬"""
     
@@ -320,6 +343,140 @@ async def error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
 
+async def takeoff_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    Handle /takeoff command - Analyze construction plan PDF.
+    
+    Args:
+        update: Telegram update object
+        context: Callback context
+    """
+    user = update.effective_user
+    logger.info(f"User {user.id} requested takeoff analysis")
+    
+    # Check if user has uploaded a PDF in the message
+    message = update.message
+    
+    # Store the user ID in context for document handler
+    if 'awaiting_pdf' not in context.user_data:
+        context.user_data['awaiting_pdf'] = {}
+    
+    context.user_data['awaiting_pdf'][user.id] = True
+    
+    await update.message.reply_text(
+        "📋 **Construction Takeoff Analysis**\n\n"
+        "Please upload a PDF file of your construction plans.\n\n"
+        "I will analyze the plans and provide a detailed takeoff for:\n"
+        "• Storm drainage systems\n"
+        "• Water distribution systems\n"
+        "• Sanitary sewer systems\n"
+        "• Fire Department Connections (FDC)\n\n"
+        "Upload your PDF now...",
+        parse_mode='Markdown'
+    )
+
+
+async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """
+    Handle document uploads (PDF files for takeoff analysis).
+    
+    Args:
+        update: Telegram update object
+        context: Callback context
+    """
+    user = update.effective_user
+    document = update.message.document
+    
+    # Check if document is a PDF
+    if not document.file_name.lower().endswith('.pdf'):
+        await update.message.reply_text(
+            "⚠️ Please upload a PDF file for takeoff analysis.\n"
+            "Use /takeoff command first, then upload your PDF."
+        )
+        return
+    
+    logger.info(f"User {user.id} uploaded PDF: {document.file_name}")
+    
+    # Check if user requested takeoff
+    awaiting_pdf = context.user_data.get('awaiting_pdf', {})
+    if user.id not in awaiting_pdf or not awaiting_pdf[user.id]:
+        await update.message.reply_text(
+            "📋 I received a PDF file. Would you like me to analyze it for construction takeoff?\n\n"
+            "Use /takeoff command to start the analysis.",
+            parse_mode='Markdown'
+        )
+        return
+    
+    # Clear the awaiting flag
+    context.user_data['awaiting_pdf'][user.id] = False
+    
+    try:
+        # Send processing message
+        processing_msg = await update.message.reply_text(
+            "⏳ Processing your construction plans...\n"
+            "This may take a moment...",
+            parse_mode='Markdown'
+        )
+        
+        # Download the file
+        file = await document.get_file()
+        file_content = await file.download_as_bytearray()
+        
+        # Save to temporary file
+        file_path = pdf_processor.save_uploaded_file(
+            bytes(file_content),
+            document.file_name
+        )
+        
+        try:
+            # Process PDF
+            pdf_data = await pdf_processor.process_pdf(file_path)
+            pdf_metadata = await pdf_processor.extract_metadata(file_path)
+            
+            # Update processing message
+            await processing_msg.edit_text(
+                "📄 PDF processed successfully!\n"
+                "🔍 Analyzing construction plans...",
+                parse_mode='Markdown'
+            )
+            
+            # Perform takeoff analysis
+            analysis = await takeoff_analyzer.analyze_plans(
+                pdf_data['text'],
+                pdf_metadata,
+                systems=['storm', 'water', 'sewer', 'fdc']
+            )
+            
+            # Format and send response
+            response = takeoff_analyzer.format_takeoff_response(analysis)
+            
+            # Delete processing message
+            await processing_msg.delete()
+            
+            # Send analysis results (may need to split if too long)
+            if len(response) > 4096:
+                # Split into chunks
+                chunks = [response[i:i+4096] for i in range(0, len(response), 4096)]
+                for chunk in chunks:
+                    await update.message.reply_text(chunk, parse_mode='Markdown')
+            else:
+                await update.message.reply_text(response, parse_mode='Markdown')
+            
+            logger.info(f"Takeoff analysis completed for user {user.id}")
+            
+        finally:
+            # Clean up temporary file
+            pdf_processor.cleanup_file(file_path)
+        
+    except Exception as e:
+        logger.error(f"Error processing PDF for takeoff: {e}")
+        await update.message.reply_text(
+            f"⚠️ Error processing PDF: {str(e)}\n\n"
+            "Please ensure your PDF is valid and try again.",
+            parse_mode='Markdown'
+        )
+
+
 def main():
     """Main function to run the bot."""
     # Validate configuration
@@ -338,6 +495,13 @@ def main():
     application.add_handler(CommandHandler("claude", claude_command))
     application.add_handler(CommandHandler("gpt", gpt_command))
     application.add_handler(CommandHandler("both", both_command))
+    application.add_handler(CommandHandler("takeoff", takeoff_command))
+    
+    # Add document handler for PDF uploads
+    application.add_handler(MessageHandler(
+        filters.Document.PDF,
+        handle_document
+    ))
     
     # Add message handler for regular messages
     application.add_handler(MessageHandler(
