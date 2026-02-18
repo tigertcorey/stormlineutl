@@ -17,6 +17,7 @@ A production-ready, multi-AI Telegram bot that integrates **Claude 3.5 Sonnet** 
 - **Intelligent Synthesis**: Automatically combines the best aspects of both AI responses
 - **Conversation History**: Maintains context across your conversation (last 10 messages)
 - **Graceful Degradation**: Automatically falls back to a single model if one is unavailable
+- **PDF Conversion Tool**: Convert Edmund job proposals to Stormline Master v3 format (see [CONVERSION_README.md](CONVERSION_README.md))
 
 ### 🛠️ Technical Features
 - **Async Architecture**: Built with Python's async/await for optimal performance
@@ -217,18 +218,20 @@ docker-compose down -v
 
 ```
 stormlineutl/
-├── bot.py                 # Main bot entry point with handlers
-├── ai_models.py          # AI model integrations (Claude, GPT-4)
-├── config.py             # Configuration management
-├── utils.py              # Helper functions and utilities
-├── requirements.txt      # Python dependencies
-├── Dockerfile           # Docker container definition
-├── docker-compose.yml   # Docker Compose configuration
-├── .env.example         # Environment variables template
-├── .gitignore          # Git ignore rules
-├── README.md           # This file
-├── SETUP.md            # Detailed setup guide
-└── logs/               # Log directory (created at runtime)
+├── bot.py                          # Main bot entry point with handlers
+├── ai_models.py                   # AI model integrations (Claude, GPT-4)
+├── config.py                      # Configuration management
+├── utils.py                       # Helper functions and utilities
+├── convert_edmund_to_stormline.py # PDF conversion tool
+├── requirements.txt               # Python dependencies
+├── Dockerfile                     # Docker container definition
+├── docker-compose.yml             # Docker Compose configuration
+├── .env.example                   # Environment variables template
+├── .gitignore                     # Git ignore rules
+├── README.md                      # This file
+├── SETUP.md                       # Detailed setup guide
+├── CONVERSION_README.md           # PDF conversion tool documentation
+└── logs/                          # Log directory (created at runtime)
 ```
 
 ## 🔧 Troubleshooting
