@@ -14,12 +14,14 @@ A production-ready, multi-AI Telegram bot that integrates **Claude 3.5 Sonnet** 
   - `/claude` - Get responses from Claude AI only
   - `/gpt` - Get responses from GPT-4 only
   - `/both` or default - Get synthesized responses combining insights from both models
+- **PDF Document Scanning**: Upload PDF files for automatic text extraction and AI-powered analysis
 - **Intelligent Synthesis**: Automatically combines the best aspects of both AI responses
 - **Conversation History**: Maintains context across your conversation (last 10 messages)
 - **Graceful Degradation**: Automatically falls back to a single model if one is unavailable
 
 ### 🛠️ Technical Features
 - **Async Architecture**: Built with Python's async/await for optimal performance
+- **PDF Processing**: Automatic text extraction from PDF documents using PyPDF
 - **Modular Design**: Clean separation of concerns (bot handlers, AI models, config, utilities)
 - **Error Handling**: Comprehensive error handling with automatic retry logic and exponential backoff
 - **Docker Support**: Production-ready Docker setup with multi-stage builds
@@ -142,6 +144,39 @@ MAX_MESSAGE_LENGTH=4000           # Maximum message length
 | `/gpt <message>` | Query GPT-4 only | `/gpt What is machine learning?` |
 | `/both <message>` | Query both models with synthesis | `/both Compare Python and JavaScript` |
 | `<any message>` | Default: query both models | `How does blockchain work?` |
+| **Upload PDF** | Analyze PDF documents | Upload any PDF file directly |
+
+### PDF Document Analysis
+
+Upload any PDF document to get AI-powered analysis:
+
+1. Click the attachment icon (📎) in Telegram
+2. Select your PDF file
+3. Optionally add a caption with specific questions about the document
+4. Send it to the bot
+
+The bot will:
+- Extract all text from the PDF
+- Analyze the content using both Claude and GPT-4
+- Provide a comprehensive synthesized analysis
+- Include both AI models' unique perspectives
+
+**Example:**
+```
+You: [Upload "proposal.pdf" with caption "Summarize the key points"]
+
+Bot: 📄 Analysis of proposal.pdf:
+
+🤖 Synthesized Answer:
+This proposal outlines a construction project for...
+
+---
+💡 Claude's perspective:
+The document emphasizes...
+
+🧠 GPT-4's perspective:
+Key financial aspects include...
+```
 
 ### Example Interactions
 
@@ -304,6 +339,9 @@ The modular architecture makes it easy to extend:
 - **Configuration Options**: Add to `config.py`
 
 ## 🗺️ Roadmap
+
+Completed features:
+- [x] **PDF Document Scanning**: Extract and analyze text from PDF files
 
 Future features planned:
 
