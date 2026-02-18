@@ -499,7 +499,7 @@ def main():
     
     # Add document handler for PDF uploads
     application.add_handler(MessageHandler(
-        filters.Document.PDF,
+        filters.Document.MimeType('application/pdf'),
         handle_document
     ))
     
