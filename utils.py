@@ -7,8 +7,16 @@ import logging
 import asyncio
 from typing import Optional, Callable, Any
 from functools import wraps
+import tempfile
+import os
+from pypdf import PdfReader
 
 logger = logging.getLogger(__name__)
+
+
+class PDFProcessingError(Exception):
+    """Custom exception for PDF processing errors."""
+    pass
 
 
 def sanitize_input(text: str, max_length: int = 4000) -> str:
@@ -181,3 +189,64 @@ def truncate_text(text: str, max_length: int = 4000, suffix: str = "...") -> str
         return text
     
     return text[:max_length - len(suffix)] + suffix
+
+
+async def extract_text_from_pdf(file_path: str) -> str:
+    """
+    Extract text content from a PDF file.
+    
+    Args:
+        file_path: Path to the PDF file
+        
+    Returns:
+        Extracted text content
+        
+    Raises:
+        PDFProcessingError: If PDF extraction fails
+    """
+    try:
+        logger.info(f"Extracting text from PDF: {file_path}")
+        
+        # Run PDF extraction in thread pool to avoid blocking
+        loop = asyncio.get_event_loop()
+        text = await loop.run_in_executor(
+            None,
+            _extract_pdf_sync,
+            file_path
+        )
+        
+        logger.info(f"Successfully extracted {len(text)} characters from PDF")
+        return text
+        
+    except Exception as e:
+        logger.error(f"Failed to extract text from PDF: {e}")
+        raise PDFProcessingError(f"Failed to process PDF: {str(e)}") from e
+
+
+
+def _extract_pdf_sync(file_path: str) -> str:
+    """
+    Synchronous PDF text extraction (to be run in thread pool).
+    
+    Args:
+        file_path: Path to the PDF file
+        
+    Returns:
+        Extracted text content
+    """
+    reader = PdfReader(file_path)
+    text_parts = []
+    
+    for page_num, page in enumerate(reader.pages, 1):
+        try:
+            page_text = page.extract_text()
+            if page_text.strip():
+                text_parts.append(f"--- Page {page_num} ---\n{page_text}\n")
+        except Exception as e:
+            logger.warning(f"Failed to extract text from page {page_num}: {e}")
+            text_parts.append(f"--- Page {page_num} ---\n[Could not extract text from this page]\n")
+    
+    if not text_parts:
+        raise PDFProcessingError("No text could be extracted from the PDF")
+    
+    return "\n".join(text_parts)
