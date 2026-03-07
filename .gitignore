@@ -61,3 +61,10 @@ temp/
 # Generated conversion files
 edmund_converted_to_stormline_v3.txt
 edmund_converted_to_stormline_v3.json
+
+# Sensitive business/client documents — never commit these
+*.pdf
+*.docx
+*.xlsx
+*.xls
+*.csv
