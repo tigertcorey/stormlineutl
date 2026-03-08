@@ -48,9 +48,11 @@ def ps_status() -> dict:
     script = """
 try {
     $ps = New-Object -ComObject PlanSwift9.PlanSwift
+    $root = $ps.Root()
     $jobName = $ps.GetPropertyResultAsString('\\Job', 'Name', '(none)')
     $pageCount = $ps.GetPropertyResultAsString('\\Job\\Pages', 'ChildCount', '0')
-    $takeoffCount = $ps.GetPropertyResultAsString('\\Job\\Takeoff', 'ChildCount', '0')
+    $takeoff = $root.GetItem('\\Job\\Takeoff')
+    $takeoffCount = if ($takeoff) { $takeoff.ChildCount() } else { 0 }
     Write-Output "STATUS: CONNECTED"
     Write-Output "JOB: $jobName"
     Write-Output "PAGES: $pageCount"
