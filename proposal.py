@@ -11,7 +11,7 @@ from datetime import datetime
 from lxml import etree
 
 TEMPLATE_PATH = "/mnt/c/Users/Corey Tigert/OneDrive/Desktop/STORMLINE_MASTER_PROPOSAL_v5.docx"
-OUTPUT_DIR = "/mnt/c/Users/Corey Tigert/OneDrive/Desktop"
+PROJECTS_DIR = "/mnt/c/Users/Corey Tigert/OneDrive/Desktop/PROJECTS"
 
 # Template table index for each utility type
 SECTION_TABLE = {"storm": 1, "water": 2, "sanitary": 3, "sewer": 3, "fire": 4, "fdc": 4}
@@ -183,8 +183,10 @@ def generate_docx(estimate_data: dict, project_address: str = "",
         _set_cell(c, breakdown)
     _set_cell(total_row.cells[-1], f"${total_bid:,.2f}")
 
-    # ── Save ──────────────────────────────────────────────────────────────
-    safe_name = re.sub(r"[^\w\s-]", "", job_name).strip().replace(" ", "_")
-    out_path  = os.path.join(OUTPUT_DIR, f"PROPOSAL_{safe_name}_{datetime.now().strftime('%Y%m%d')}.docx")
+    # ── Save into project folder ──────────────────────────────────────────
+    safe_name    = re.sub(r"[^\w\s-]", "", job_name).strip().replace(" ", "_")
+    project_dir  = os.path.join(PROJECTS_DIR, safe_name)
+    os.makedirs(project_dir, exist_ok=True)
+    out_path = os.path.join(project_dir, f"PROPOSAL_{safe_name}_{datetime.now().strftime('%Y%m%d')}.docx")
     doc.save(out_path)
     return {"success": True, "path": out_path, "total_bid": total_bid}
