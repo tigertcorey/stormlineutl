@@ -260,3 +260,199 @@ try {
     count = int(count_line.split(":", 1)[1].strip()) if count_line else len(jobs)
 
     return {"success": True, "data": {"count": count, "jobs": jobs}}
+
+
+# ─── Write / Control ──────────────────────────────────────────────────────────
+
+def ps_add_section(name: str) -> dict:
+    """Add a new takeoff section under \\Job\\Takeoff."""
+    safe = name.replace("'", "''")
+    script = f"""
+try {{
+    $ps = New-Object -ComObject PlanSwift9.PlanSwift
+    $existing = $ps.GetPropertyResultAsString('\\Job\\Takeoff\\{safe}', 'Name', '')
+    if ($existing -ne '') {{
+        Write-Output "EXISTS: \\Job\\Takeoff\\{safe}"
+    }} else {{
+        $item = $ps.AddItem('\\Job\\Takeoff', '{safe}', 'Section')
+        Write-Output "CREATED: \\Job\\Takeoff\\{safe}"
+    }}
+    [System.Runtime.InteropServices.Marshal]::ReleaseComObject($ps) | Out-Null
+}} catch {{
+    Write-Output "ERROR: $($_.Exception.Message)"
+}}
+"""
+    ok, out, err = _run_ps(script)
+    if not ok and not out:
+        return {"success": False, "error": err}
+    if "ERROR:" in out:
+        return {"success": False, "error": out.split("ERROR:", 1)[1].strip()}
+    existed = out.startswith("EXISTS:")
+    return {"success": True, "path": f"\\Job\\Takeoff\\{name}", "already_existed": existed}
+
+
+def ps_add_item(section: str, name: str, item_type: str = "Linear", unit: str = "LF") -> dict:
+    """Add a takeoff item to a section. item_type: Linear, Area, Count, Assembly."""
+    safe_section = section.replace("'", "''")
+    safe_name = name.replace("'", "''")
+    safe_unit = unit.replace("'", "''")
+    path = f"\\Job\\Takeoff\\{section}\\{name}"
+    script = f"""
+try {{
+    $ps = New-Object -ComObject PlanSwift9.PlanSwift
+    $item = $ps.AddItem('\\Job\\Takeoff\\{safe_section}', '{safe_name}', '{item_type}')
+    $ps.SetProperty('\\Job\\Takeoff\\{safe_section}\\{safe_name}', 'Unit', '{safe_unit}')
+    Write-Output "CREATED: \\Job\\Takeoff\\{safe_section}\\{safe_name}"
+    [System.Runtime.InteropServices.Marshal]::ReleaseComObject($ps) | Out-Null
+}} catch {{
+    Write-Output "ERROR: $($_.Exception.Message)"
+}}
+"""
+    ok, out, err = _run_ps(script)
+    if not ok and not out:
+        return {"success": False, "error": err}
+    if "ERROR:" in out:
+        return {"success": False, "error": out.split("ERROR:", 1)[1].strip()}
+    return {"success": True, "path": path, "type": item_type, "unit": unit}
+
+
+def ps_set_property(path: str, prop: str, value: str) -> dict:
+    """Set any property on a PlanSwift item (Quantity, Length, Unit, Description, etc.)."""
+    safe_path = path.replace("'", "''")
+    safe_prop = prop.replace("'", "''")
+    safe_val = value.replace("'", "''")
+    script = f"""
+try {{
+    $ps = New-Object -ComObject PlanSwift9.PlanSwift
+    $ps.SetProperty('{safe_path}', '{safe_prop}', '{safe_val}')
+    Write-Output "SET: {safe_path} | {safe_prop} = {safe_val}"
+    [System.Runtime.InteropServices.Marshal]::ReleaseComObject($ps) | Out-Null
+}} catch {{
+    Write-Output "ERROR: $($_.Exception.Message)"
+}}
+"""
+    ok, out, err = _run_ps(script)
+    if not ok and not out:
+        return {"success": False, "error": err}
+    if "ERROR:" in out:
+        return {"success": False, "error": out.split("ERROR:", 1)[1].strip()}
+    return {"success": True, "path": path, "property": prop, "value": value}
+
+
+def ps_delete_item(path: str) -> dict:
+    """Delete an item or section from the takeoff."""
+    safe_path = path.replace("'", "''")
+    script = f"""
+try {{
+    $ps = New-Object -ComObject PlanSwift9.PlanSwift
+    $ps.DeleteItem('{safe_path}')
+    Write-Output "DELETED: {safe_path}"
+    [System.Runtime.InteropServices.Marshal]::ReleaseComObject($ps) | Out-Null
+}} catch {{
+    Write-Output "ERROR: $($_.Exception.Message)"
+}}
+"""
+    ok, out, err = _run_ps(script)
+    if not ok and not out:
+        return {"success": False, "error": err}
+    if "ERROR:" in out:
+        return {"success": False, "error": out.split("ERROR:", 1)[1].strip()}
+    return {"success": True, "deleted": path}
+
+
+def ps_get_current_page() -> dict:
+    """Get the name and index of the currently active page in PlanSwift."""
+    script = """
+try {
+    $ps = New-Object -ComObject PlanSwift9.PlanSwift
+    $pageName = $ps.GetPropertyResultAsString('\\Job', 'CurrentPageName', '')
+    $pageIndex = $ps.GetPropertyResultAsString('\\Job', 'CurrentPageIndex', '-1')
+    $scale = $ps.GetPropertyResultAsString('\\Job', 'CurrentPageScale', '')
+    Write-Output "PAGE: $pageName"
+    Write-Output "INDEX: $pageIndex"
+    Write-Output "SCALE: $scale"
+    [System.Runtime.InteropServices.Marshal]::ReleaseComObject($ps) | Out-Null
+} catch {
+    Write-Output "ERROR: $($_.Exception.Message)"
+}
+"""
+    ok, out, err = _run_ps(script)
+    if not ok and not out:
+        return {"success": False, "error": err}
+    if "ERROR:" in out:
+        return {"success": False, "error": out.split("ERROR:", 1)[1].strip()}
+    lines = {k.strip(): v.strip() for k, v in
+             (line.split(":", 1) for line in out.splitlines() if ":" in line)}
+    return {
+        "success": True,
+        "data": {
+            "page_name": lines.get("PAGE", ""),
+            "page_index": lines.get("INDEX", "-1"),
+            "scale": lines.get("SCALE", ""),
+        }
+    }
+
+
+def ps_screenshot() -> dict:
+    """Capture the PlanSwift window as a PNG. Returns the WSL path to the saved image."""
+    script = r"""
+Add-Type -AssemblyName System.Windows.Forms
+Add-Type -AssemblyName System.Drawing
+Add-Type @"
+using System;
+using System.Drawing;
+using System.Runtime.InteropServices;
+public class WinCapture {
+    [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr h, out RECT r);
+    [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr h);
+    [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr h, int cmd);
+    public struct RECT { public int Left, Top, Right, Bottom; }
+}
+"@
+$procs = Get-Process | Where-Object { $_.MainWindowTitle -like "*PlanSwift*" -or $_.ProcessName -like "*planswift*" }
+if ($procs.Count -eq 0) { Write-Output "ERROR: PlanSwift window not found"; exit 1 }
+$hwnd = $procs[0].MainWindowHandle
+[WinCapture]::ShowWindow($hwnd, 9) | Out-Null
+[WinCapture]::SetForegroundWindow($hwnd) | Out-Null
+Start-Sleep -Milliseconds 400
+$rect = New-Object WinCapture+RECT
+[WinCapture]::GetWindowRect($hwnd, [ref]$rect) | Out-Null
+$w = $rect.Right - $rect.Left
+$h = $rect.Bottom - $rect.Top
+if ($w -le 0 -or $h -le 0) { Write-Output "ERROR: Invalid window bounds"; exit 1 }
+$bmp = New-Object System.Drawing.Bitmap($w, $h)
+$gfx = [System.Drawing.Graphics]::FromImage($bmp)
+$gfx.CopyFromScreen($rect.Left, $rect.Top, 0, 0, $bmp.Size)
+$outPath = "$env:TEMP\ps_screenshot.png"
+$bmp.Save($outPath, [System.Drawing.Imaging.ImageFormat]::Png)
+$gfx.Dispose(); $bmp.Dispose()
+Write-Output "SAVED: $outPath"
+Write-Output "WIDTH: $w"
+Write-Output "HEIGHT: $h"
+"""
+    ok, out, err = _run_ps(script)
+    if not ok and not out:
+        return {"success": False, "error": err}
+    if "ERROR:" in out:
+        return {"success": False, "error": out.split("ERROR:", 1)[1].strip()}
+
+    lines = {k.strip(): v.strip() for k, v in
+             (line.split(":", 1) for line in out.splitlines() if ":" in line)}
+    win_path = lines.get("SAVED", "")
+    if not win_path:
+        return {"success": False, "error": "Screenshot path not returned"}
+
+    # Convert Windows temp path to WSL path
+    # e.g. C:\Users\...\AppData\Local\Temp\ps_screenshot.png
+    # → /mnt/c/Users/.../AppData/Local/Temp/ps_screenshot.png
+    wsl_path = win_path.replace("\\", "/")
+    if wsl_path[1] == ":":
+        wsl_path = "/mnt/" + wsl_path[0].lower() + wsl_path[2:]
+
+    return {
+        "success": True,
+        "win_path": win_path,
+        "wsl_path": wsl_path,
+        "width": int(lines.get("WIDTH", "0")),
+        "height": int(lines.get("HEIGHT", "0")),
+    }

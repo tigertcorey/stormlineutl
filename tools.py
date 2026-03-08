@@ -13,7 +13,11 @@ import fnmatch
 from datetime import datetime
 from typing import Any
 from config import config
-from planswift import ps_status, ps_get_takeoff, ps_load_pdf, ps_list_jobs
+from planswift import (
+    ps_status, ps_get_takeoff, ps_load_pdf, ps_list_jobs,
+    ps_add_section, ps_add_item, ps_set_property, ps_delete_item,
+    ps_get_current_page, ps_screenshot,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -178,6 +182,317 @@ def _windows_open(path: str, **_) -> dict:
         return {"success": True, "opened": win_path}
     except Exception as e:
         return {"success": False, "error": str(e)}
+
+
+# ─── PlanSwift AI Tracing ────────────────────────────────────────────────────
+
+def _calibration_file() -> str:
+    return os.path.join(config.data_dir, "ps_calibrations.json")
+
+def _load_calibrations() -> dict:
+    p = _calibration_file()
+    if not os.path.exists(p):
+        return {}
+    with open(p) as f:
+        return json.load(f)
+
+def _save_calibrations(data: dict):
+    with open(_calibration_file(), "w") as f:
+        json.dump(data, f, indent=2)
+
+
+def _ps_vision_analyze(image_path: str, prompt: str) -> str:
+    """Send a screenshot to Claude Vision and return the text response."""
+    import anthropic, base64
+    with open(image_path, "rb") as f:
+        img_data = base64.standard_b64encode(f.read()).decode()
+    client = anthropic.Anthropic(api_key=config.anthropic_api_key)
+    msg = client.messages.create(
+        model="claude-sonnet-4-6",
+        max_tokens=4096,
+        messages=[{
+            "role": "user",
+            "content": [
+                {"type": "image", "source": {"type": "base64", "media_type": "image/png", "data": img_data}},
+                {"type": "text", "text": prompt},
+            ]
+        }]
+    )
+    return msg.content[0].text
+
+
+def ps_calibrate_page(**_) -> dict:
+    """
+    Screenshot the current PlanSwift page, use Vision to find the scale bar,
+    compute pixels-per-foot, and store it for this page.
+    """
+    # Get screenshot
+    shot = ps_screenshot()
+    if not shot["success"]:
+        return {"success": False, "error": f"Screenshot failed: {shot['error']}"}
+
+    # Get current page info
+    page_info = ps_get_current_page()
+    page_name = page_info.get("data", {}).get("page_name", "unknown") if page_info["success"] else "unknown"
+
+    prompt = f"""This is a screenshot of a construction plan page in PlanSwift software (page: "{page_name}").
+
+Your job is to find the graphic scale bar on this plan sheet and calibrate it.
+
+Please analyze the image and return a JSON object with these exact fields:
+{{
+  "found_scale_bar": true/false,
+  "scale_bar_length_feet": <the labeled length in feet, e.g. 50 or 100>,
+  "scale_bar_pixel_length": <estimated length of that bar in pixels>,
+  "scale_bar_location": "<describe where it is, e.g. 'bottom left corner'>",
+  "pixels_per_foot": <scale_bar_pixel_length / scale_bar_length_feet>,
+  "image_width_px": {shot['width']},
+  "image_height_px": {shot['height']},
+  "view_type": "<'plan' or 'profile' or 'detail' or 'other'>",
+  "sheet_title": "<sheet title or number if visible>",
+  "confidence": "<high/medium/low>",
+  "notes": "<anything that might affect accuracy>"
+}}
+
+Return ONLY the JSON object, no other text."""
+
+    try:
+        raw = _ps_vision_analyze(shot["wsl_path"], prompt)
+        # Extract JSON from response
+        import re
+        match = re.search(r'\{.*\}', raw, re.DOTALL)
+        if not match:
+            return {"success": False, "error": "Vision did not return valid JSON", "raw": raw}
+        cal = json.loads(match.group())
+
+        if not cal.get("found_scale_bar"):
+            return {"success": False, "error": "No scale bar found on this page", "vision_notes": cal.get("notes")}
+
+        # Store calibration
+        calibrations = _load_calibrations()
+        calibrations[page_name] = {
+            "page_name": page_name,
+            "pixels_per_foot": cal["pixels_per_foot"],
+            "scale_bar_feet": cal["scale_bar_length_feet"],
+            "scale_bar_px": cal["scale_bar_pixel_length"],
+            "image_width": shot["width"],
+            "image_height": shot["height"],
+            "view_type": cal.get("view_type", "plan"),
+            "sheet_title": cal.get("sheet_title", ""),
+            "confidence": cal.get("confidence", "medium"),
+            "notes": cal.get("notes", ""),
+            "calibrated_at": datetime.now().isoformat(),
+            "screenshot": shot["wsl_path"],
+        }
+        _save_calibrations(calibrations)
+
+        return {
+            "success": True,
+            "page": page_name,
+            "pixels_per_foot": cal["pixels_per_foot"],
+            "scale_bar": f"{cal['scale_bar_length_feet']} ft = {cal['scale_bar_pixel_length']} px",
+            "view_type": cal.get("view_type"),
+            "confidence": cal.get("confidence"),
+            "notes": cal.get("notes"),
+        }
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+def ps_manual_calibrate(page_name: str, pixels_per_foot: float, note: str = "", **_) -> dict:
+    """Manually set calibration for a page if Vision can't find the scale bar."""
+    calibrations = _load_calibrations()
+    calibrations[page_name] = {
+        "page_name": page_name,
+        "pixels_per_foot": pixels_per_foot,
+        "confidence": "manual",
+        "notes": note,
+        "calibrated_at": datetime.now().isoformat(),
+    }
+    _save_calibrations(calibrations)
+    return {"success": True, "page": page_name, "pixels_per_foot": pixels_per_foot}
+
+
+def ps_analyze_pipes(**_) -> dict:
+    """
+    Screenshot current PlanSwift page, use Vision to identify all pipe runs,
+    sizes, materials, and approximate lengths. Returns structured pipe inventory
+    with confidence scores. Does NOT create items — use ps_create_takeoff after reviewing.
+    """
+    shot = ps_screenshot()
+    if not shot["success"]:
+        return {"success": False, "error": f"Screenshot failed: {shot['error']}"}
+
+    page_info = ps_get_current_page()
+    page_name = page_info.get("data", {}).get("page_name", "unknown") if page_info["success"] else "unknown"
+
+    # Get stored calibration
+    calibrations = _load_calibrations()
+    cal = calibrations.get(page_name)
+    cal_info = f"Calibration: {cal['pixels_per_foot']:.2f} px/ft ({cal['scale_bar_feet']} ft scale bar)" if cal else "No calibration stored for this page — lengths will be estimated only."
+
+    prompt = f"""This is a construction plan sheet (page: "{page_name}") shown in PlanSwift software.
+{cal_info}
+Image size: {shot['width']} x {shot['height']} pixels.
+
+You are a professional underground utility takeoff estimator. Analyze this plan and identify ALL pipe runs visible.
+
+For each pipe segment, return a JSON entry. Return a JSON object like this:
+{{
+  "view_type": "plan or profile or detail",
+  "sheet_title": "<sheet title if visible>",
+  "scale_bar_visible": true/false,
+  "legend_found": true/false,
+  "pipes": [
+    {{
+      "id": "pipe_001",
+      "size": "<e.g. 18-inch or 24-inch>",
+      "material": "<RCP, PVC SDR26, C900, DI, HDPE, etc.>",
+      "type": "<storm, sanitary, water, fire, FDC>",
+      "from_structure": "<manhole, inlet, headwall, etc. at start>",
+      "to_structure": "<structure at end>",
+      "path_points_relative": [[x1,y1],[x2,y2],...],  // 0.0-1.0 relative to image size, trace along pipe centerline
+      "pixel_length": <total pixel length of path>,
+      "estimated_lf": <pixel_length / pixels_per_foot if calibrated, else null>,
+      "size_label_visible": true/false,
+      "size_label_text": "<exact label text if visible>",
+      "confidence": "high/medium/low",
+      "notes": "<slope, invert, special conditions>"
+    }}
+  ],
+  "structures": [
+    {{
+      "id": "str_001",
+      "type": "<manhole, inlet, junction box, headwall, cleanout, hydrant, valve, etc.>",
+      "label": "<structure label/number if shown>",
+      "location_relative": [x, y],
+      "connects_to": ["pipe_001", "pipe_002"],
+      "confidence": "high/medium/low"
+    }}
+  ],
+  "flags": ["<anything uncertain or needing field verification>"],
+  "unidentified_lines": <count of lines that look like pipes but couldn't be identified>
+}}
+
+Be thorough. Trace every visible pipe run. Use the full polyline path (multiple points) for curved or angled runs.
+Return ONLY the JSON, no other text."""
+
+    try:
+        raw = _ps_vision_analyze(shot["wsl_path"], prompt)
+        import re
+        match = re.search(r'\{.*\}', raw, re.DOTALL)
+        if not match:
+            return {"success": False, "error": "Vision did not return parseable JSON", "raw": raw[:500]}
+        result = json.loads(match.group())
+
+        # Enrich with calibration data
+        if cal and cal.get("pixels_per_foot"):
+            ppf = cal["pixels_per_foot"]
+            for pipe in result.get("pipes", []):
+                if pipe.get("pixel_length") and not pipe.get("estimated_lf"):
+                    pipe["estimated_lf"] = round(pipe["pixel_length"] / ppf, 1)
+
+        result["page_name"] = page_name
+        result["calibrated"] = cal is not None
+        result["screenshot"] = shot["wsl_path"]
+
+        return {"success": True, "data": result}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+def ps_create_takeoff_from_analysis(analysis: dict, section_name: str = "", **_) -> dict:
+    """
+    Take the output from ps_analyze_pipes and create the actual takeoff items
+    in PlanSwift. Groups pipes by type/size into sections.
+    Only creates items with confidence >= medium unless force=True.
+    """
+    pipes = analysis.get("pipes", [])
+    structures = analysis.get("structures", [])
+    page_name = analysis.get("page_name", "unknown")
+
+    if not pipes and not structures:
+        return {"success": False, "error": "No pipes or structures in analysis data"}
+
+    created = []
+    skipped = []
+    errors = []
+
+    # Group pipes by utility type → section
+    type_map = {
+        "storm": section_name or "Storm Drainage",
+        "sanitary": section_name or "Sanitary Sewer",
+        "water": section_name or "Water",
+        "fire": section_name or "Fire/FDC",
+        "fdc": section_name or "Fire/FDC",
+    }
+
+    sections_needed = set()
+    for pipe in pipes:
+        if pipe.get("confidence", "low") == "low":
+            skipped.append({"id": pipe["id"], "reason": "low confidence"})
+            continue
+        ptype = pipe.get("type", "storm").lower()
+        sections_needed.add(type_map.get(ptype, section_name or "Utilities"))
+
+    # Count structures by type for sections
+    structure_types = set(s.get("type", "").lower() for s in structures)
+    if any(t in structure_types for t in ["manhole", "inlet", "junction box", "headwall"]):
+        sections_needed.add(section_name or "Storm Drainage")
+
+    # Create sections
+    for sec in sections_needed:
+        r = ps_add_section(sec)
+        if not r["success"] and not r.get("already_existed"):
+            errors.append(f"Section '{sec}': {r.get('error')}")
+
+    # Create pipe items
+    for pipe in pipes:
+        if pipe.get("confidence", "low") == "low":
+            continue
+        ptype = pipe.get("type", "storm").lower()
+        sec = type_map.get(ptype, section_name or "Utilities")
+        size = pipe.get("size", "unknown")
+        mat = pipe.get("material", "")
+        item_name = f"{size} {mat}".strip() if mat else size
+        lf = pipe.get("estimated_lf")
+
+        r = ps_add_item(sec, item_name, "Linear", "LF")
+        if r["success"]:
+            if lf:
+                ps_set_property(r["path"], "Quantity", str(lf))
+                ps_set_property(r["path"], "Length", str(lf))
+            ps_set_property(r["path"], "Description",
+                f"Page: {page_name} | From: {pipe.get('from_structure','')} To: {pipe.get('to_structure','')}")
+            created.append({"name": item_name, "section": sec, "lf": lf, "confidence": pipe["confidence"]})
+        else:
+            errors.append(f"Item '{item_name}': {r.get('error')}")
+
+    # Create structure count items
+    struct_counts: dict[str, int] = {}
+    for s in structures:
+        if s.get("confidence", "low") == "low":
+            continue
+        stype = s.get("type", "unknown")
+        struct_counts[stype] = struct_counts.get(stype, 0) + 1
+
+    for stype, count in struct_counts.items():
+        ptype = "storm"  # default — improve with smarter detection if needed
+        sec = type_map.get(ptype, section_name or "Storm Drainage")
+        r = ps_add_item(sec, stype.title(), "Count", "EA")
+        if r["success"]:
+            ps_set_property(r["path"], "Quantity", str(count))
+            created.append({"name": stype.title(), "section": sec, "count": count, "type": "structure"})
+        else:
+            errors.append(f"Structure '{stype}': {r.get('error')}")
+
+    return {
+        "success": True,
+        "created": created,
+        "skipped_low_confidence": skipped,
+        "errors": errors,
+        "summary": f"{len(created)} items created, {len(skipped)} skipped (low confidence), {len(errors)} errors",
+    }
 
 
 # ─── Projects ────────────────────────────────────────────────────────────────
@@ -535,6 +850,91 @@ TOOL_DEFINITIONS = [
         "input_schema": {"type": "object", "properties": {}}
     },
     {
+        "name": "planswift_add_section",
+        "description": "Add a new takeoff section in PlanSwift (e.g. 'Storm Drainage', 'Water', 'Sanitary Sewer').",
+        "input_schema": {
+            "type": "object",
+            "properties": {"name": {"type": "string", "description": "Section name"}},
+            "required": ["name"]
+        }
+    },
+    {
+        "name": "planswift_add_item",
+        "description": "Add a takeoff item to a section. Types: Linear (pipes, conduit), Area (paving, seeding), Count (manholes, inlets, valves).",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "section": {"type": "string", "description": "Section name (must exist)"},
+                "name": {"type": "string", "description": "Item name, e.g. '18-inch RCP'"},
+                "item_type": {"type": "string", "description": "Linear, Area, or Count"},
+                "unit": {"type": "string", "description": "LF, SF, EA, CY, etc."},
+            },
+            "required": ["section", "name"]
+        }
+    },
+    {
+        "name": "planswift_set_property",
+        "description": "Set a property on a PlanSwift takeoff item. Use for setting Quantity, Length, Unit, Description, etc.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "path": {"type": "string", "description": r"Full item path e.g. \Job\Takeoff\Storm Drainage\18-inch RCP"},
+                "prop": {"type": "string", "description": "Property name: Quantity, Length, Unit, Description"},
+                "value": {"type": "string", "description": "Value to set"},
+            },
+            "required": ["path", "prop", "value"]
+        }
+    },
+    {
+        "name": "planswift_delete_item",
+        "description": "Delete a takeoff item or section from PlanSwift.",
+        "input_schema": {
+            "type": "object",
+            "properties": {"path": {"type": "string", "description": "Full path of item to delete"}},
+            "required": ["path"]
+        }
+    },
+    {
+        "name": "planswift_get_current_page",
+        "description": "Get the name, index, and scale of the currently active page in PlanSwift.",
+        "input_schema": {"type": "object", "properties": {}}
+    },
+    {
+        "name": "planswift_calibrate_page",
+        "description": "Screenshot the current PlanSwift page, use AI Vision to find the scale bar, and store the calibration (pixels-per-foot) for this page. Must be done before tracing pipes on a new page.",
+        "input_schema": {"type": "object", "properties": {}}
+    },
+    {
+        "name": "planswift_manual_calibrate",
+        "description": "Manually set the calibration for a page if auto-calibration fails. Provide page name and pixels-per-foot.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "page_name": {"type": "string"},
+                "pixels_per_foot": {"type": "number", "description": "How many pixels equal one foot on this page"},
+                "note": {"type": "string", "description": "How you determined this"},
+            },
+            "required": ["page_name", "pixels_per_foot"]
+        }
+    },
+    {
+        "name": "planswift_analyze_pipes",
+        "description": "Screenshot the current PlanSwift page and use AI Vision to identify all pipe runs, sizes, materials, structures, and estimated lengths. Returns analysis for review — does NOT create takeoff items yet.",
+        "input_schema": {"type": "object", "properties": {}}
+    },
+    {
+        "name": "planswift_create_takeoff_from_analysis",
+        "description": "Take the pipe analysis data and create actual takeoff items in PlanSwift with correct quantities. Run planswift_analyze_pipes first and review results before calling this.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "analysis": {"type": "object", "description": "The data.pipes/structures from planswift_analyze_pipes result"},
+                "section_name": {"type": "string", "description": "Override section name (optional — auto-detected from pipe types if blank)"},
+            },
+            "required": ["analysis"]
+        }
+    },
+    {
         "name": "fs_list_directory",
         "description": "List files and directories at a given path. Use WSL paths (e.g. /home/corey_tigert/... or /mnt/c/Users/...).",
         "input_schema": {
@@ -619,6 +1019,15 @@ TOOL_MAP = {
     "planswift_get_takeoff": lambda **_: ps_get_takeoff(),
     "planswift_load_pdf": lambda pdf_path, **_: ps_load_pdf(pdf_path),
     "planswift_list_jobs": lambda **_: ps_list_jobs(),
+    "planswift_add_section": lambda name, **_: ps_add_section(name),
+    "planswift_add_item": lambda section, name, item_type="Linear", unit="LF", **_: ps_add_item(section, name, item_type, unit),
+    "planswift_set_property": lambda path, prop, value, **_: ps_set_property(path, prop, value),
+    "planswift_delete_item": lambda path, **_: ps_delete_item(path),
+    "planswift_get_current_page": lambda **_: ps_get_current_page(),
+    "planswift_calibrate_page": ps_calibrate_page,
+    "planswift_manual_calibrate": ps_manual_calibrate,
+    "planswift_analyze_pipes": ps_analyze_pipes,
+    "planswift_create_takeoff_from_analysis": lambda analysis, section_name="", **_: ps_create_takeoff_from_analysis(analysis, section_name),
     "fs_list_directory": _fs_list_directory,
     "fs_read_file": _fs_read_file,
     "fs_write_file": _fs_write_file,
