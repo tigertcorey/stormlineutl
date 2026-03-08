@@ -1,17 +1,13 @@
 """
-Configuration management for Stormline UTL Bot.
-Loads and validates environment variables for bot operation.
+Configuration for Stormline Management Bot.
 """
 
 import os
 import logging
-from typing import Optional
 from dotenv import load_dotenv
 
-# Load environment variables from .env file
-load_dotenv()
+load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), '..', '.env'))
 
-# Configure logging
 LOG_LEVEL = os.getenv('LOG_LEVEL', 'INFO').upper()
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -22,62 +18,32 @@ logger = logging.getLogger(__name__)
 
 
 class Config:
-    """Configuration class for bot settings."""
-    
     def __init__(self):
-        """Initialize configuration from environment variables."""
-        self.telegram_token: str = self._get_required_env('TELEGRAM_BOT_TOKEN')
-        self.anthropic_api_key: str = self._get_required_env('ANTHROPIC_API_KEY')
-        self.openai_api_key: str = self._get_required_env('OPENAI_API_KEY')
-        self.log_level: str = os.getenv('LOG_LEVEL', 'INFO')
-        
-        # Optional configurations
-        self.max_history_length: int = int(os.getenv('MAX_HISTORY_LENGTH', '10'))
+        self.telegram_token: str = self._require('TELEGRAM_BOT_TOKEN')
+        self.anthropic_api_key: str = self._require('ANTHROPIC_API_KEY')
+        self.max_history_length: int = int(os.getenv('MAX_HISTORY_LENGTH', '20'))
         self.max_message_length: int = int(os.getenv('MAX_MESSAGE_LENGTH', '4000'))
-        
-        logger.info("Configuration loaded successfully")
-    
+        self.allowed_chat_id: int = int(os.getenv('ALLOWED_CHAT_ID', '6830687114'))
+
+        # Paths
+        base = os.path.dirname(os.path.abspath(__file__))
+        root = os.path.dirname(base)
+        self.website_path: str = os.path.join(
+            os.path.expanduser('~'), '.openclaw', 'workspace', 'stormline-website', 'index.html'
+        )
+        self.data_dir: str = os.path.join(base, 'data')
+        self.projects_file: str = os.path.join(self.data_dir, 'projects.json')
+        self.approvals_file: str = os.path.join(self.data_dir, 'approvals.json')
+
+        os.makedirs(self.data_dir, exist_ok=True)
+        logger.info("Config loaded")
+
     @staticmethod
-    def _get_required_env(key: str) -> str:
-        """
-        Get required environment variable or raise error.
-        
-        Args:
-            key: Environment variable name
-            
-        Returns:
-            Environment variable value
-            
-        Raises:
-            ValueError: If environment variable is not set
-        """
-        value = os.getenv(key)
-        if not value:
-            raise ValueError(f"Required environment variable {key} is not set")
-        return value
-    
-    def validate(self) -> bool:
-        """
-        Validate configuration settings.
-        
-        Returns:
-            True if configuration is valid
-        """
-        if not self.telegram_token:
-            logger.error("Telegram bot token is not configured")
-            return False
-        
-        if not self.anthropic_api_key:
-            logger.error("Anthropic API key is not configured")
-            return False
-        
-        if not self.openai_api_key:
-            logger.error("OpenAI API key is not configured")
-            return False
-        
-        logger.info("Configuration validation passed")
-        return True
+    def _require(key: str) -> str:
+        val = os.getenv(key)
+        if not val:
+            raise ValueError(f"Missing required env var: {key}")
+        return val
 
 
-# Global configuration instance
 config = Config()

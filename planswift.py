@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 TIMEOUT = 60
 PS_FLAGS = [
-    "powershell.exe",
+    "/mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe",
     "-NonInteractive",
     "-NoProfile",
     "-ExecutionPolicy", "Bypass",
@@ -38,7 +38,7 @@ def _run_ps(script: str) -> tuple[bool, str, str]:
             proc.communicate()
             return False, "", "PowerShell timed out after 60 seconds"
     except FileNotFoundError:
-        return False, "", "powershell.exe not found — is this running in WSL2?"
+        return False, "", "powershell.exe not found at expected path"
     except Exception as e:
         return False, "", str(e)
 

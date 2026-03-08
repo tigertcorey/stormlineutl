@@ -20,7 +20,7 @@ class ClaudeModel:
     def __init__(self):
         """Initialize Claude client."""
         self.client = anthropic.Anthropic(api_key=config.anthropic_api_key)
-        self.model = "claude-3-5-sonnet-20241022"
+        self.model = "claude-3-haiku-20240307"
         logger.info("Claude model initialized")
     
     @retry_with_backoff(max_retries=3, base_delay=1.0)
@@ -212,7 +212,7 @@ class GPTModel:
     def __init__(self):
         """Initialize GPT-4 client."""
         self.client = openai.AsyncOpenAI(api_key=config.openai_api_key)
-        self.model = "gpt-4"
+        self.model = "gpt-4o-mini"
         logger.info("GPT-4 model initialized")
     
     @retry_with_backoff(max_retries=3, base_delay=1.0)
