@@ -189,6 +189,19 @@ def _windows_open(path: str, **_) -> dict:
 def _calibration_file() -> str:
     return os.path.join(config.data_dir, "ps_calibrations.json")
 
+TAKEOFF_MANIFEST_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "ps_takeoff_manifest.json")
+
+def _load_takeoff_manifest() -> dict:
+    if not os.path.exists(TAKEOFF_MANIFEST_FILE):
+        return {}
+    with open(TAKEOFF_MANIFEST_FILE) as f:
+        return json.load(f)
+
+def _save_takeoff_manifest(manifest: dict):
+    with open(TAKEOFF_MANIFEST_FILE, "w") as f:
+        json.dump(manifest, f, indent=2)
+
+
 def _load_calibrations() -> dict:
     p = _calibration_file()
     if not os.path.exists(p):
@@ -480,12 +493,319 @@ def ps_create_takeoff_from_analysis(analysis: dict, section_name: str = "", **_)
         else:
             errors.append(f"Structure '{stype}': {r.get('error')}")
 
+    # Save manifest so ps_get_takeoff can enumerate by name
+    if created:
+        manifest = _load_takeoff_manifest()
+        for item in created:
+            sec = item["section"]
+            name = item["name"]
+            if sec not in manifest:
+                manifest[sec] = []
+            if name not in manifest[sec]:
+                manifest[sec].append(name)
+        _save_takeoff_manifest(manifest)
+
     return {
         "success": True,
         "created": created,
         "skipped_low_confidence": skipped,
         "errors": errors,
         "summary": f"{len(created)} items created, {len(skipped)} skipped (low confidence), {len(errors)} errors",
+    }
+
+
+# ─── Pricing Engine ──────────────────────────────────────────────────────────
+# At-cost installed rates (Corey + Jarvis, March 2026). Apply O&P after.
+
+PRICING_DB = {
+    "storm_pipe": {  # $/LF by size (inches)
+        "10": 145, "12": 145, "15": 165, "18": 195,
+        "24": 240, "27": 275, "30": 310, "36": 365,
+    },
+    "storm_struct": {  # $/EA
+        "inlet": 6500, "curb_inlet": 6500, "area_inlet": 6000,
+        "junction_box": 7500, "catch_basin": 6000,
+        "manhole": 8000, "headwall": 9000,
+    },
+    "water_pipe": {  # $/LF
+        "2": 55, "3": 65, "4": 85, "6": 110, "8": 155, "12": 210,
+    },
+    "water_struct": {  # $/EA
+        "gate_valve": 1200, "valve": 1200,
+        "gate_valve_12": 2500,
+        "fire_hydrant": 8500, "hydrant": 8500,
+        "dcva": 14000, "backflow": 14000,
+        "tapping_sleeve": 5500,
+        "service": 1800,
+        "meter": 1800,
+    },
+    "sewer_pipe": {  # $/LF
+        "4": 55, "6": 135, "8": 175, "10": 210,
+    },
+    "sewer_struct": {  # $/EA
+        "manhole": 7500, "drop_mh": 11000,
+        "connect_existing": 5000,
+        "cleanout": 750,
+        "service": 1200,
+    },
+    "fire_pipe": {  # $/LF — DI, same general range as water
+        "4": 85, "6": 110, "8": 155,
+    },
+}
+
+OAP_RATES = {
+    "competitive": 0.20,
+    "standard": 0.25,
+    "negotiated": 0.30,
+    "emergency": 0.40,
+    "floor": 0.15,
+}
+
+
+def _lookup_pipe_rate(util_type: str, size: str, material: str = "") -> float:
+    size_str = str(size).replace('"', '').replace("inch", "").strip()
+    mat = material.lower()
+    if util_type in ("fire", "fdc"):
+        db = PRICING_DB["fire_pipe"]
+    elif util_type == "water":
+        db = PRICING_DB["water_pipe"]
+    elif util_type in ("sanitary", "sewer"):
+        db = PRICING_DB["sewer_pipe"]
+    else:
+        db = PRICING_DB["storm_pipe"]
+    if size_str in db:
+        return float(db[size_str])
+    try:
+        n = int(size_str)
+        candidates = [(abs(int(k) - n), float(v)) for k, v in db.items() if k.isdigit()]
+        return sorted(candidates)[0][1] if candidates else 0.0
+    except (ValueError, TypeError):
+        return 0.0
+
+
+def _lookup_struct_rate(name: str, util_type: str = "storm") -> float:
+    t = name.lower().replace(" ", "_").replace("-", "_")
+    if util_type in ("water", "fire", "fdc"):
+        db = PRICING_DB["water_struct"]
+    elif util_type in ("sanitary", "sewer"):
+        db = PRICING_DB["sewer_struct"]
+    else:
+        db = PRICING_DB["storm_struct"]
+    if t in db:
+        return float(db[t])
+    for key in db:
+        if key in t or t.startswith(key[:4]):
+            return float(db[key])
+    return 0.0
+
+
+def estimate_from_takeoff(job_name: str = "", gc_name: str = "",
+                           job_type: str = "standard", is_private: bool = True, **_) -> dict:
+    """
+    Pull current PlanSwift takeoff quantities, apply at-cost rates + O&P, and
+    return a full cost breakdown with profit analysis.
+    job_type: competitive | standard | negotiated | emergency
+    """
+    manifest = _load_takeoff_manifest()
+    takeoff = ps_get_takeoff(manifest if manifest else None)
+    if not takeoff["success"]:
+        return {"success": False, "error": f"PlanSwift error: {takeoff.get('error')}"}
+
+    items = takeoff["data"].get("items", [])
+    if not items:
+        return {"success": False, "error": "No takeoff items in PlanSwift. Run the takeoff first."}
+
+    oap_rate = OAP_RATES.get(job_type.lower(), OAP_RATES["standard"])
+    line_items = []
+    section_totals = {}
+
+    for item in items:
+        section = item.get("section", "General")
+        name = item.get("item", "")
+        unit = item.get("unit", "LF").upper()
+        try:
+            qty = float(item.get("quantity") or item.get("length") or 0)
+        except (ValueError, TypeError):
+            qty = 0.0
+        if qty <= 0:
+            continue
+
+        sec_lower = section.lower()
+        if any(w in sec_lower for w in ("storm", "drain")):
+            util_type = "storm"
+        elif "water" in sec_lower:
+            util_type = "water"
+        elif any(w in sec_lower for w in ("sanitary", "sewer")):
+            util_type = "sewer"
+        elif any(w in sec_lower for w in ("fire", "fdc")):
+            util_type = "fire"
+        else:
+            util_type = "storm"
+
+        size_m = re.search(r'(\d+)', name)
+        size = size_m.group(1) if size_m else "0"
+        material = next((m for m in ("RCP", "C900", "SDR26", "SDR-26", "HDPE", "DI", "PVC")
+                         if m.lower() in name.lower()), "")
+
+        is_struct = unit == "EA" or any(w in name.lower() for w in
+            ("manhole", "inlet", "junction", "headwall", "hydrant",
+             "valve", "cleanout", "service", "dcva", "backflow", "meter"))
+
+        unit_cost = _lookup_struct_rate(name, util_type) if is_struct else _lookup_pipe_rate(util_type, size, material)
+        extension = round(qty * unit_cost, 2)
+
+        line_items.append({
+            "section": section, "item": name, "qty": qty,
+            "unit": unit, "unit_cost": unit_cost, "extension": extension,
+        })
+        section_totals[section] = section_totals.get(section, 0) + extension
+
+    direct_cost = sum(li["extension"] for li in line_items)
+    mob = max(7000, round(direct_cost * 0.04))
+    testing = 3500
+    total_direct = direct_cost + mob + testing
+    oap_amount = round(total_direct * oap_rate)
+    subtotal = total_direct + oap_amount
+    sales_tax = round(direct_cost * 0.50 * 0.0825) if is_private else 0
+    total_bid = subtotal + sales_tax
+    # Overhead ~15% of direct, profit = remainder of O&P
+    overhead = round(total_direct * 0.15)
+    profit = oap_amount - overhead
+    margin_pct = round((profit / total_bid) * 100, 1) if total_bid > 0 else 0
+    unpriced = [li["item"] for li in line_items if li["unit_cost"] == 0]
+
+    return {
+        "success": True,
+        "data": {
+            "job_name": job_name,
+            "gc_name": gc_name,
+            "job_type": job_type,
+            "oap_rate_pct": int(oap_rate * 100),
+            "line_items": line_items,
+            "section_totals": section_totals,
+            "direct_cost": direct_cost,
+            "mobilization": mob,
+            "testing": testing,
+            "total_direct_cost": total_direct,
+            "oap_amount": oap_amount,
+            "subtotal_with_oap": subtotal,
+            "sales_tax": sales_tax,
+            "total_bid": total_bid,
+            "estimated_profit": profit,
+            "estimated_margin_pct": margin_pct,
+            "unpriced_items": unpriced,
+        }
+    }
+
+
+def queue_purchase(vendor: str, amount: float, description: str,
+                   justification: str = "", **_) -> dict:
+    """Queue a purchase or supplier order for Corey's approval. Never commits money automatically."""
+    approval_id = queue_approval(
+        action_type="purchase",
+        description=(f"PURCHASE REQUEST\nVendor: {vendor}\n"
+                     f"Amount: ${amount:,.2f}\nDescription: {description}\n"
+                     f"Justification: {justification}"),
+        payload={"vendor": vendor, "amount": amount,
+                 "description": description, "justification": justification},
+    )
+    return {
+        "success": True, "queued": True, "approval_id": approval_id,
+        "message": f"Purchase queued for your approval — ${amount:,.2f} to {vendor}. ID: {approval_id}",
+    }
+
+
+def generate_proposal(estimate_data: dict, project_address: str = "",
+                       scope_notes: str = "", **_) -> dict:
+    """
+    Build a bid proposal from an estimate and queue the file write for Corey's approval.
+    estimate_data: the full dict from estimate_from_takeoff (pass the whole result or just 'data').
+    """
+    d = estimate_data.get("data", estimate_data)
+    job_name = d.get("job_name", "Project")
+    gc_name = d.get("gc_name", "General Contractor")
+    total_bid = d.get("total_bid", 0)
+    section_totals = d.get("section_totals", {})
+    mob = d.get("mobilization", 0)
+    testing = d.get("testing", 0)
+    sales_tax = d.get("sales_tax", 0)
+    oap_pct = d.get("oap_rate_pct", 25)
+    profit = d.get("estimated_profit", 0)
+    margin = d.get("estimated_margin_pct", 0)
+    today = datetime.now().strftime("%B %d, %Y")
+
+    lines = [
+        "STORMLINE UTILITIES, LLC",
+        "(469) 732-1133  |  corey@stormlineutilities.com  |  stormlineutilities.com",
+        "",
+        "PROPOSAL",
+        f"Date:         {today}",
+        f"Project:      {job_name}",
+    ]
+    if project_address:
+        lines.append(f"Location:     {project_address}")
+    lines += [
+        f"Submitted to: {gc_name}",
+        "",
+        "=" * 64,
+        "SCOPE OF WORK",
+        "=" * 64,
+        "Stormline Utilities, LLC proposes to furnish all labor,",
+        "materials, and equipment for the underground utility work",
+        "described below, per the referenced plans and specifications.",
+        "",
+    ]
+    if scope_notes:
+        lines += [scope_notes, ""]
+
+    lines += ["=" * 64, "PRICE SUMMARY", "=" * 64, ""]
+    for section, sub in sorted(section_totals.items()):
+        lines.append(f"  {section:<40} ${sub:>12,.2f}")
+    if mob:
+        lines.append(f"  {'Mobilization':<40} ${mob:>12,.2f}")
+    if testing:
+        lines.append(f"  {'Testing & Startup':<40} ${testing:>12,.2f}")
+    if sales_tax:
+        lines.append(f"  {'Sales Tax (8.25% materials)':<40} ${sales_tax:>12,.2f}")
+    lines += [
+        "",
+        "  " + "-" * 58,
+        f"  {'TOTAL BASE BID':<40} ${total_bid:>12,.2f}",
+        "  " + "-" * 58,
+        "",
+        "* Rock excavation, dewatering, and utility conflict resolution",
+        "  are excluded and quoted as Additional Pricing if required.",
+        "* Prevailing/Davis-Bacon wage does not apply unless stated.",
+        "* Quote valid 30 days. Payment terms: Net 30.",
+        "",
+        "=" * 64,
+        "Respectfully submitted,",
+        "",
+        "Corey Tigert",
+        "Owner, Stormline Utilities, LLC",
+        "(469) 732-1133",
+    ]
+    proposal_text = "\n".join(lines)
+
+    safe_name = re.sub(r'[^\w\s-]', '', job_name).strip().replace(' ', '_')
+    out_path = (f"/mnt/c/Users/Corey Tigert/OneDrive/Desktop/"
+                f"PROPOSAL_{safe_name}_{datetime.now().strftime('%Y%m%d')}.txt")
+
+    approval_id = queue_approval(
+        action_type="file_write",
+        description=(f"Generate proposal: {job_name}\n"
+                     f"Total bid: ${total_bid:,.2f}  |  Est. profit: ${profit:,.0f} ({margin}%)\n"
+                     f"GC: {gc_name}\nSave to Desktop as PROPOSAL_{safe_name}_...txt"),
+        payload={"path": out_path, "content": proposal_text},
+    )
+    return {
+        "success": True, "queued": True, "approval_id": approval_id,
+        "preview": "\n".join(lines[:30]),
+        "total_bid": total_bid,
+        "estimated_profit": profit,
+        "estimated_margin_pct": margin,
+        "message": (f"Proposal ready — ${total_bid:,.2f} total bid, "
+                    f"${profit:,.0f} profit ({margin}%). Queued for your approval. ID: {approval_id}"),
     }
 
 
@@ -685,6 +1005,14 @@ def _execute_approval(approval: dict) -> dict:
             return {"success": True, "message": f"File written: {payload['path']}"}
         except Exception as e:
             return {"success": False, "error": str(e)}
+
+    elif action_type == 'purchase':
+        # Purchase approvals are manual — bot can't execute the payment
+        return {
+            "success": True,
+            "message": (f"Purchase approved: ${payload.get('amount', 0):,.2f} to "
+                        f"{payload.get('vendor')}. Proceed manually."),
+        }
 
     return {"success": False, "error": f"Unknown action type: {action_type}"}
 
@@ -929,6 +1257,60 @@ TOOL_DEFINITIONS = [
         }
     },
     {
+        "name": "estimate_from_takeoff",
+        "description": (
+            "Pull current PlanSwift takeoff quantities, apply Stormline at-cost rates + O&P, "
+            "and return a full cost estimate with line items, section totals, profit, and margin. "
+            "Run after takeoff items are in PlanSwift. job_type controls O&P: "
+            "competitive=20%, standard=25%, negotiated=30%, emergency=40%."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "job_name": {"type": "string", "description": "Project name"},
+                "gc_name": {"type": "string", "description": "General contractor name"},
+                "job_type": {"type": "string", "description": "competitive | standard | negotiated | emergency (default: standard)"},
+                "is_private": {"type": "boolean", "description": "True = private work (add 8.25% sales tax on materials), False = public"},
+            }
+        }
+    },
+    {
+        "name": "generate_proposal",
+        "description": (
+            "Build a bid proposal from an estimate and queue the file write for Corey's approval. "
+            "Takes the full output from estimate_from_takeoff. "
+            "Does NOT include unit prices in the proposal (GC rule). Saves to Desktop as a .txt. "
+            "Requires approval before writing."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "estimate_data": {"type": "object", "description": "Full result from estimate_from_takeoff"},
+                "project_address": {"type": "string", "description": "Project address / city"},
+                "scope_notes": {"type": "string", "description": "Additional scope description to include"},
+            },
+            "required": ["estimate_data"]
+        }
+    },
+    {
+        "name": "queue_purchase",
+        "description": (
+            "Queue a purchase or supplier order for Corey's approval. "
+            "NEVER commits money automatically — all purchases require explicit approval. "
+            "Use for material orders, equipment rentals, subcontractor POs, etc."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "vendor": {"type": "string", "description": "Vendor / supplier name"},
+                "amount": {"type": "number", "description": "Dollar amount"},
+                "description": {"type": "string", "description": "What is being purchased"},
+                "justification": {"type": "string", "description": "Why this purchase is needed"},
+            },
+            "required": ["vendor", "amount", "description"]
+        }
+    },
+    {
         "name": "fs_list_directory",
         "description": "List files and directories at a given path. Use WSL paths (e.g. /home/corey_tigert/... or /mnt/c/Users/...).",
         "input_schema": {
@@ -1010,7 +1392,7 @@ TOOL_MAP = {
     "queue_email_draft": queue_email_draft,
     "list_pending_approvals": list_pending_approvals,
     "planswift_status": lambda **_: ps_status(),
-    "planswift_get_takeoff": lambda **_: ps_get_takeoff(),
+    "planswift_get_takeoff": lambda **_: ps_get_takeoff(_load_takeoff_manifest() or None),
     "planswift_load_pdf": lambda pdf_path, **_: ps_load_pdf(pdf_path),
     "planswift_list_jobs": lambda **_: ps_list_jobs(),
     "planswift_add_section": lambda name, **_: ps_add_section(name),
@@ -1022,6 +1404,9 @@ TOOL_MAP = {
     "planswift_manual_calibrate": ps_manual_calibrate,
     "planswift_analyze_pipes": ps_analyze_pipes,
     "planswift_create_takeoff_from_analysis": lambda analysis, section_name="", **_: ps_create_takeoff_from_analysis(analysis, section_name),
+    "estimate_from_takeoff": estimate_from_takeoff,
+    "generate_proposal": generate_proposal,
+    "queue_purchase": queue_purchase,
     "fs_list_directory": _fs_list_directory,
     "fs_read_file": _fs_read_file,
     "fs_write_file": _fs_write_file,

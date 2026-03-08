@@ -82,62 +82,76 @@ try {
     }
 
 
-def ps_get_takeoff() -> dict:
-    """Extract all quantities from current job — sections, items, qty, unit."""
-    script = """
+def ps_get_takeoff(manifest: dict = None) -> dict:
+    """
+    Extract all quantities from current job using a section/item name manifest.
+    manifest: {section_name: [item_name, ...]} — built by ps_create_takeoff_from_analysis.
+    If no manifest provided, returns section count only.
+    """
+    if not manifest:
+        # Just return section count without item details
+        script = """
 try {
     $ps = New-Object -ComObject PlanSwift9.PlanSwift
-    $toCount = [int]$ps.GetPropertyResultAsString('\\Job\\Takeoff', 'ChildCount', '0')
-
-    if ($toCount -eq 0) {
-        Write-Output "NO_TAKEOFF_DATA"
-        [System.Runtime.InteropServices.Marshal]::ReleaseComObject($ps) | Out-Null
-        exit 0
-    }
-
-    Write-Output "SECTIONS: $toCount"
-    Write-Output "---CSV---"
-    Write-Output "Section,Item,Type,Unit,Quantity,Length,Area,Volume"
-
-    $takeoff = $ps.GetItem('\\Job\\Takeoff')
-    for ($s = 0; $s -lt $toCount; $s++) {
-        $section = $takeoff.ChildItem($s)
-        $sName = $section.GetPropertyResultAsString('Name', '')
-        $sChildCount = $section.ChildCount()
-
-        for ($i = 0; $i -lt $sChildCount; $i++) {
-            $item = $section.ChildItem($i)
-            $iName  = $item.GetPropertyResultAsString('Name', '')
-            $iType  = $item.GetPropertyResultAsString('Type', '')
-            $iUnit  = $item.GetPropertyResultAsString('Unit', '')
-            $iQty   = $item.GetPropertyResultAsString('Quantity', '0')
-            $iLen   = $item.GetPropertyResultAsString('Length', '0')
-            $iArea  = $item.GetPropertyResultAsString('Area', '0')
-            $iVol   = $item.GetPropertyResultAsString('Volume', '0')
-            Write-Output "`"$sName`",`"$iName`",`"$iType`",`"$iUnit`",`"$iQty`",`"$iLen`",`"$iArea`",`"$iVol`""
-            [System.Runtime.InteropServices.Marshal]::ReleaseComObject($item) | Out-Null
-        }
-        [System.Runtime.InteropServices.Marshal]::ReleaseComObject($section) | Out-Null
-    }
-
-    [System.Runtime.InteropServices.Marshal]::ReleaseComObject($takeoff) | Out-Null
+    $root = $ps.Root()
+    $takeoff = $root.GetItem('\\Job\\Takeoff')
+    if (-not $takeoff) { Write-Output "SECTIONS: 0" }
+    else { Write-Output "SECTIONS: $($takeoff.ChildCount())" }
     [System.Runtime.InteropServices.Marshal]::ReleaseComObject($ps) | Out-Null
+} catch { Write-Output "ERROR: $($_.Exception.Message)" }
+"""
+        ok, out, err = _run_ps(script)
+        if not ok and not out:
+            return {"success": False, "error": err}
+        for line in out.splitlines():
+            if line.startswith("SECTIONS:"):
+                try:
+                    count = int(line.split(":", 1)[1].strip())
+                    return {"success": True, "data": {"sections": count, "items": []}}
+                except ValueError:
+                    pass
+        return {"success": True, "data": {"sections": 0, "items": []}}
+
+    # Build a single PS script that queries every known section+item by name
+    queries = []
+    for sec_name, item_names in manifest.items():
+        safe_sec = sec_name.replace("'", "''")
+        for item_name in item_names:
+            safe_item = item_name.replace("'", "''")
+            path = f"\\Job\\Takeoff\\{safe_sec}\\{safe_item}"
+            queries.append(
+                f"$item = $root.GetItem('{path}');"
+                f"if ($item) {{"
+                f"$qty=$item.GetPropertyResultAsString('Quantity','0');"
+                f"$unit=$item.GetPropertyResultAsString('Unit','LF');"
+                f"$len=$item.GetPropertyResultAsString('Length','0');"
+                f"Write-Output \"`\"{safe_sec}`\",`\"{safe_item}`\",`\"Linear`\",`\"$unit`\",`\"$qty`\",`\"$len`\"\";"
+                f"}}"
+            )
+
+    if not queries:
+        return {"success": True, "data": {"sections": 0, "items": []}}
+
+    body = "\n".join(queries)
+    script = f"""
+try {{
+    $ps = New-Object -ComObject PlanSwift9.PlanSwift
+    $root = $ps.Root()
+    Write-Output "---CSV---"
+    Write-Output "Section,Item,Type,Unit,Quantity,Length"
+    {body}
     Write-Output "---END---"
-} catch {
+    [System.Runtime.InteropServices.Marshal]::ReleaseComObject($ps) | Out-Null
+}} catch {{
     Write-Output "ERROR: $($_.Exception.Message)"
-}
+}}
 """
     ok, out, err = _run_ps(script)
     if not ok and not out:
-        return {"success": False, "error": err or "PowerShell execution failed"}
+        return {"success": False, "error": err}
+    if "ERROR:" in out and "---CSV---" not in out:
+        return {"success": False, "error": out.split("ERROR:", 1)[1].strip()}
 
-    if "NO_TAKEOFF_DATA" in out:
-        return {"success": True, "data": {"sections": 0, "items": []}}
-
-    if out.startswith("ERROR:"):
-        return {"success": False, "error": out[6:].strip()}
-
-    # Parse CSV block
     items = []
     in_csv = False
     for line in out.splitlines():
@@ -152,29 +166,15 @@ try {
             row = next(csv.reader(io.StringIO(line)))
             if len(row) >= 5:
                 items.append({
-                    "section": row[0],
-                    "item": row[1],
-                    "type": row[2],
-                    "unit": row[3],
-                    "quantity": row[4],
+                    "section": row[0], "item": row[1], "type": row[2],
+                    "unit": row[3], "quantity": row[4],
                     "length": row[5] if len(row) > 5 else "0",
-                    "area": row[6] if len(row) > 6 else "0",
-                    "volume": row[7] if len(row) > 7 else "0",
                 })
         except Exception:
             pass
 
-    # Extract section count from header
-    section_count = 0
-    for line in out.splitlines():
-        if line.startswith("SECTIONS:"):
-            try:
-                section_count = int(line.split(":", 1)[1].strip())
-            except ValueError:
-                pass
-            break
-
-    return {"success": True, "data": {"sections": section_count, "items": items}}
+    sections = len(manifest)
+    return {"success": True, "data": {"sections": sections, "items": items}}
 
 
 def ps_load_pdf(pdf_windows_path: str) -> dict:

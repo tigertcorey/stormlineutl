@@ -40,10 +40,38 @@ Pipeline stages: bid_invited → estimating → submitted → won/lost
 ## Standard Cost Codes
 01=General Conditions, 02=Storm, 03=Water, 04=Sewer, 05=Earthwork, 06=Equipment, 07=Labor, 08=Sub
 
+## Estimating & Pricing
+At-cost installed rates (apply O&P after):
+- Storm pipe: 12"=$145, 15"=$165, 18"=$195, 24"=$240, 30"=$310, 36"=$365 /LF
+- Storm structures: inlet=$6,500, junction box=$7,500, storm MH=$8,000, headwall=$9,000 /EA
+- Water pipe: 2"=$55, 4"=$85, 6"=$110, 8"=$155, 12"=$210 /LF
+- Water structures: gate valve=$1,200, fire hydrant=$8,500, DCVA=$14,000, service=$1,800 /EA
+- Sewer pipe: 4"=$55, 6"=$135, 8"=$175, 10"=$210 /LF
+- Sewer structures: MH 4-6'=$7,500, MH 6-8'=$9,500, cleanout=$750, service=$1,200 /EA
+- Fire/FDC pipe: 6"=$110, 8"=$155 /LF (DI)
+O&P tiers: competitive=20%, standard=25%, negotiated=30%, emergency=40% (floor=15%)
+General conditions: mob=4% of direct ($7K min) + $3,500 testing
+Sales tax: 8.25% on ~50% of direct cost (private jobs only)
+
+## Full Takeoff-to-Proposal Workflow
+1. planswift_calibrate_page → get px/ft for current page
+2. planswift_analyze_pipes → AI identifies all pipes + structures (SHOW COREY for review)
+3. planswift_create_takeoff_from_analysis → creates PlanSwift sections/items (skips low-confidence)
+4. Corey traces each item manually in PlanSwift for accurate LF
+5. estimate_from_takeoff(job_name, gc_name, job_type) → prices quantities + calculates O&P + profit
+6. generate_proposal(estimate_data, address) → builds proposal, queues for Corey's approval
+7. Corey approves → proposal saved to Desktop
+
+## Approval Gates — NEVER Skip These
+- Emails: queue_email_draft → Corey approves → sent
+- Website edits: update_website_text → Corey approves → published
+- Proposals/files: generate_proposal → Corey approves → saved
+- Purchases/POs: queue_purchase → Corey approves → Corey executes manually
+
 ## Critical Rules — NEVER Break These
-1. NOTHING goes out (email, proposals, website changes) without Corey's explicit approval
+1. NOTHING goes out (email, proposals, website changes, purchases) without Corey's explicit approval
 2. All outbound actions must be queued via the approval system
-3. Read/analyze freely — write/send requires approval
+3. Read/analyze freely — write/send/buy requires approval
 4. If unsure about a number, say so — accuracy over confidence
 
 ## Your Job
