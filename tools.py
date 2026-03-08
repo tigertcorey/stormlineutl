@@ -810,14 +810,19 @@ def generate_proposal(estimate_data: dict, project_address: str = "",
 
     safe_name = re.sub(r'[^\w\s-]', '', job_name).strip().replace(' ', '_')
     out_path = (f"/mnt/c/Users/Corey Tigert/OneDrive/Desktop/"
-                f"PROPOSAL_{safe_name}_{datetime.now().strftime('%Y%m%d')}.txt")
+                f"PROPOSAL_{safe_name}_{datetime.now().strftime('%Y%m%d')}.docx")
 
     approval_id = queue_approval(
-        action_type="file_write",
-        description=(f"Generate proposal: {job_name}\n"
+        action_type="proposal_docx",
+        description=(f"Generate DOCX proposal: {job_name}\n"
                      f"Total bid: ${total_bid:,.2f}  |  Est. profit: ${profit:,.0f} ({margin}%)\n"
-                     f"GC: {gc_name}\nSave to Desktop as PROPOSAL_{safe_name}_...txt"),
-        payload={"path": out_path, "content": proposal_text},
+                     f"GC: {gc_name}\nSave to Desktop as PROPOSAL_{safe_name}_...docx"),
+        payload={
+            "estimate_data": d,
+            "project_address": project_address,
+            "scope_notes": scope_notes,
+            "out_path": out_path,
+        },
     )
     return {
         "success": True, "queued": True, "approval_id": approval_id,
@@ -1024,6 +1029,21 @@ def _execute_approval(approval: dict) -> dict:
             with open(payload['path'], "w") as f:
                 f.write(payload['content'])
             return {"success": True, "message": f"File written: {payload['path']}"}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    elif action_type == 'proposal_docx':
+        try:
+            from proposal import generate_docx
+            result = generate_docx(
+                estimate_data=payload.get("estimate_data", {}),
+                project_address=payload.get("project_address", ""),
+            )
+            if result["success"]:
+                # Open it in Windows
+                win_path = result["path"].replace("/mnt/c/", "C:\\").replace("/", "\\")
+                subprocess.Popen(["cmd.exe", "/c", "start", "", win_path])
+            return result
         except Exception as e:
             return {"success": False, "error": str(e)}
 
