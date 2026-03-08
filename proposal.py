@@ -184,8 +184,17 @@ def generate_docx(estimate_data: dict, project_address: str = "",
     _set_cell(total_row.cells[-1], f"${total_bid:,.2f}")
 
     # ── Save into project folder ──────────────────────────────────────────
-    safe_name    = re.sub(r"[^\w\s-]", "", job_name).strip().replace(" ", "_")
-    project_dir  = os.path.join(PROJECTS_DIR, safe_name)
+    safe_name = re.sub(r"[^\w\s-]", "", job_name).strip().replace(" ", "_")
+    # Try to match an existing folder (case-insensitive) before creating a new one
+    project_dir = None
+    if os.path.isdir(PROJECTS_DIR):
+        job_upper = job_name.upper()
+        for folder in os.listdir(PROJECTS_DIR):
+            if folder.upper() == job_upper or folder.upper() == safe_name.upper().replace("_", " "):
+                project_dir = os.path.join(PROJECTS_DIR, folder)
+                break
+    if project_dir is None:
+        project_dir = os.path.join(PROJECTS_DIR, safe_name)
     os.makedirs(project_dir, exist_ok=True)
     out_path = os.path.join(project_dir, f"PROPOSAL_{safe_name}_{datetime.now().strftime('%Y%m%d')}.docx")
     doc.save(out_path)
