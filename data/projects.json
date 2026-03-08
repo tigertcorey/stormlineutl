@@ -1,0 +1,233 @@
+[
+  {
+    "id": "proj-vivere-midlothian",
+    "name": "Vivere at Midlothian",
+    "gc_name": "TBD",
+    "status": "submitted",
+    "bid_amount": 1274928,
+    "address": "Midlothian, TX",
+    "notes": "Submitted 02/22/26. Storm $405,850 | Water $416,850 | Sewer $382,150 | Mob+Tax+Test $70K. 2,600 LF 8\" water, 1,750 LF 8\" sewer, 85 services. Plans: Manhard Consulting interim review set.",
+    "created_at": "2026-02-22T00:00:00",
+    "updated_at": "2026-02-22T00:00:00"
+  },
+  {
+    "id": "proj-ac-marriott-grapevine",
+    "name": "AC Marriott \u2014 Grapevine",
+    "gc_name": "Huitt-Zollars",
+    "status": "submitted",
+    "bid_amount": 500000,
+    "address": "Grapevine, TX",
+    "notes": "Tanner sourced the job. Engineer: Huitt-Zollars. Owner: Supreme Bright Grapevine IX LLC. Scope: Storm, Water/Fire, Sewer. Last sent to Tanner 3/6 at $500,000.",
+    "created_at": "2026-02-14T00:00:00",
+    "updated_at": "2026-03-06T20:08:21.104985"
+  },
+  {
+    "id": "proj-rowlett-hotel",
+    "name": "Rowlett Hotel",
+    "gc_name": "Tanner Winders / T18 Construction",
+    "status": "submitted",
+    "bid_amount": 606000,
+    "address": "Rowlett, TX",
+    "notes": "Submitted ~03/03/26. Storm + water + sewer. Proposal SL-2026-024.",
+    "created_at": "2026-03-03T00:00:00",
+    "updated_at": "2026-03-03T00:00:00"
+  },
+  {
+    "id": "proj-anna-greerhouse",
+    "name": "Greerhouse Multifamily \u2014 Anna",
+    "gc_name": "Tanner Winders / T18 Construction",
+    "status": "estimating",
+    "bid_amount": null,
+    "address": "Anna, TX",
+    "notes": "Bid #2026022. Received 02/25/26. Takeoff in progress.",
+    "created_at": "2026-02-25T00:00:00",
+    "updated_at": "2026-03-06T00:00:00"
+  },
+  {
+    "id": "proj-lafayette-crossing",
+    "name": "Lafayette Crossing",
+    "gc_name": "Triton General Contractor",
+    "status": "lost",
+    "bid_amount": null,
+    "address": "Fate, TX",
+    "notes": "Removed from active pipeline per Corey 03/06/26. Reference only.",
+    "created_at": "2026-03-02T00:00:00",
+    "updated_at": "2026-03-06T17:13:44.732813"
+  },
+  {
+    "id": "proj-cfa-edmond",
+    "name": "CFA \u2014 Edmond, OK",
+    "gc_name": "Bar W FSU",
+    "status": "submitted",
+    "bid_amount": 549900,
+    "address": "Edmond, OK",
+    "notes": "Submitted 02/17/26. Storm/water/sewer/fire all-in.",
+    "created_at": "2026-02-17T00:00:00",
+    "updated_at": "2026-02-17T00:00:00"
+  },
+  {
+    "id": "proj-cfa-leander",
+    "name": "CFA \u2014 Leander, TX",
+    "gc_name": "CFA",
+    "status": "submitted",
+    "bid_amount": 685450,
+    "address": "Leander, TX",
+    "notes": "Submitted 02/18/26. Storm $343,681 | Water $178,413 | Sewer $91,087 | Fire $7,444.",
+    "created_at": "2026-02-18T00:00:00",
+    "updated_at": "2026-02-18T00:00:00"
+  },
+  {
+    "id": "proj-circle-k-odessa",
+    "name": "Circle K \u2014 Odessa, TX",
+    "gc_name": "Main 1.9",
+    "status": "submitted",
+    "bid_amount": 604075,
+    "address": "Odessa, TX",
+    "notes": "Submitted 02/10/26 (v2). Storm $247,140 | Water $188,080 | Sewer $109,715 | Fire $59,140.",
+    "created_at": "2026-02-10T00:00:00",
+    "updated_at": "2026-02-10T00:00:00"
+  },
+  {
+    "id": "proj-five-star-ford",
+    "name": "Five Star Ford \u2014 Fort Worth",
+    "gc_name": "Pack Properties",
+    "status": "submitted",
+    "bid_amount": 604075,
+    "address": "Fort Worth, TX",
+    "notes": "Submitted 02/14/26. Same quantities as Circle K Odessa v2 \u2014 cost may vary. GC: Pack Properties. Real separate bid.",
+    "created_at": "2026-02-14T00:00:00",
+    "updated_at": "2026-03-06T17:13:44.744917"
+  },
+  {
+    "id": "proj-sendero-bastrop",
+    "name": "Sendero Phase 1 \u2014 Bastrop",
+    "gc_name": "Sendero Dev Group",
+    "status": "submitted",
+    "bid_amount": 386000,
+    "address": "Bastrop, TX",
+    "notes": "Submitted 01/12/26. Storm $161,555 | Water $165,640 | Sewer $58,805. REFERENCE ONLY \u2014 do not include in pipeline calculations.",
+    "created_at": "2026-01-12T00:00:00",
+    "updated_at": "2026-03-06T17:13:44.742771"
+  },
+  {
+    "id": "proj-sunset-canyon",
+    "name": "Sunset Canyon \u2014 Dripping Springs",
+    "gc_name": "Austin Growth Ventures",
+    "status": "submitted",
+    "bid_amount": 339800,
+    "address": "Dripping Springs, TX",
+    "notes": "Submitted 01/13/26. Storm $96,600 | Water $24,800 | Sewer $150,400 | T18 factor $68K. REFERENCE ONLY \u2014 do not include in pipeline calculations.",
+    "created_at": "2026-01-13T00:00:00",
+    "updated_at": "2026-03-06T17:13:44.743547"
+  },
+  {
+    "id": "proj-whataburger-weatherford",
+    "name": "Whataburger \u2014 Weatherford, TX",
+    "gc_name": "Unknown",
+    "status": "submitted",
+    "bid_amount": 273696,
+    "address": "Weatherford, TX",
+    "notes": "Submitted 02/04/26. Budgetary. Storm $75,609 | Water $90,207 | Sewer $54,092. GC unknown. REFERENCE ONLY \u2014 do not include in pipeline calculations.",
+    "created_at": "2026-02-04T00:00:00",
+    "updated_at": "2026-03-06T17:13:44.744269"
+  },
+  {
+    "id": "proj-bjs-mesquite",
+    "name": "BJ's Wholesale \u2014 Mesquite (Labor Only)",
+    "gc_name": "Americas Best Utilities",
+    "status": "submitted",
+    "bid_amount": 305000,
+    "address": "Mesquite, TX",
+    "notes": "Submitted 12/02/25. Labor only. Water main ~2,450 LF, sewer/force main, storm ~550 LF 30\\\" RCP. GC: Americas Best Utilities. REFERENCE ONLY \u2014 do not include in pipeline calculations.",
+    "created_at": "2025-12-02T00:00:00",
+    "updated_at": "2026-03-06T17:13:44.741968"
+  },
+  {
+    "id": "proj-candlewood-marble-falls",
+    "name": "Candlewood Suites \u2014 Marble Falls",
+    "gc_name": "Unknown",
+    "status": "submitted",
+    "bid_amount": 623730,
+    "address": "Marble Falls, TX",
+    "notes": "Submitted 09/03/25. Includes 107 EA MC-7200 detention chambers. Storm/water/sewer. GC unknown. REFERENCE ONLY \u2014 do not include in pipeline calculations.",
+    "created_at": "2025-09-03T00:00:00",
+    "updated_at": "2026-03-06T17:13:44.738596"
+  },
+  {
+    "id": "proj-hilton-grapevine",
+    "name": "Hilton Hotel \u2014 Grapevine",
+    "gc_name": "Unknown",
+    "status": "submitted",
+    "bid_amount": 327042,
+    "address": "Grapevine, TX",
+    "notes": "Submitted 11/04/25. Storm $114,900 | Water $166,900 | Sewer $18,400 | Conduit $1,900. Incl 8.25% tax. GC unknown. In the works per Corey. REFERENCE ONLY \u2014 do not include in pipeline calculations.",
+    "created_at": "2025-11-04T00:00:00",
+    "updated_at": "2026-03-06T17:13:44.740288"
+  },
+  {
+    "id": "proj-dynamix-mckinney",
+    "name": "Dynamix McKinney",
+    "gc_name": "Unknown",
+    "status": "submitted",
+    "bid_amount": 311699,
+    "address": "McKinney, TX",
+    "notes": "Submitted 11/12/25. Main $158,149 + water conn $25,950 + FDC 4-bldg $127,600. Water + sewer + FDC underground. GC unknown. In the works per Corey. REFERENCE ONLY \u2014 do not include in pipeline calculations.",
+    "created_at": "2025-11-12T00:00:00",
+    "updated_at": "2026-03-06T17:13:44.741111"
+  },
+  {
+    "id": "proj-northlake",
+    "name": "Northlake",
+    "gc_name": "Unknown",
+    "status": "submitted",
+    "bid_amount": 487474,
+    "address": "Northlake, TX",
+    "notes": "Submitted 09/03/25. Storm/water/sewer. 400 LF 12\\\" DR-18 + 800 LF 8\\\" water, storm includes 4x2 RCB. GC unknown. REFERENCE ONLY \u2014 do not include in pipeline calculations.",
+    "created_at": "2025-09-03T00:00:00",
+    "updated_at": "2026-03-06T17:13:44.739519"
+  },
+  {
+    "id": "proj-staybridge-jackson",
+    "name": "Staybridge Suites \u2014 Jackson, TN",
+    "gc_name": "Unknown",
+    "status": "lost",
+    "bid_amount": 409712,
+    "address": "Jackson, TN",
+    "notes": "REMOVED \u2014 Jackson, TN is out of Stormline scope (TX/OK only). Reference only. Do not include in calculations.",
+    "created_at": "2025-09-25T00:00:00",
+    "updated_at": "2026-03-06T17:13:44.737664"
+  },
+  {
+    "id": "proj-a67a0bd1",
+    "name": "Grand Prairie Utilities",
+    "gc_name": "Unknown - TBD",
+    "status": "lost",
+    "bid_amount": 133900,
+    "address": "Grand Prairie, TX",
+    "notes": "DUPLICATE ENTRY - Disregard. Correct record is proj-dad66fff (Fairway Construction, $133,900, submitted)",
+    "created_at": "2026-03-06T19:12:11.503693",
+    "updated_at": "2026-03-06T19:18:01.782934"
+  },
+  {
+    "id": "proj-dad66fff",
+    "name": "Grand Prairie Utilities",
+    "gc_name": "Fairway Construction",
+    "status": "submitted",
+    "bid_amount": 133900,
+    "address": "Grand Prairie, TX",
+    "notes": "Labor + equipment only. Materials GC furnished (Ferguson quote ref B605460 dated 12/09/2025 - $181,304.68 total materials). Scope: 6\" C900 water, 8\" SDR26 sewer, 24\"/36\" RCP storm. Mob $7,500, L&E $126,400.",
+    "created_at": "2026-03-06T19:14:22.871825",
+    "updated_at": "2026-03-06T19:14:22.871841"
+  },
+  {
+    "id": "proj-3cfb1fc8",
+    "name": "Staybridge Suites \u2014 Mansfield",
+    "gc_name": "T18 / Tanner Winders",
+    "status": "submitted",
+    "bid_amount": 524100,
+    "address": null,
+    "notes": "Scope: 1,353 LF 8\" DIP water, 150 LF 6\" fire line, 411 LF 8\" SDR-26 sewer, 350 LF storm (12/15/18\" RCP), 6 inlets, riprap, FH, FDC, DCVA vault, testing, TV. Detention excluded pending clarification. Last sent 3/6.",
+    "created_at": "2026-03-06T20:08:21.101389",
+    "updated_at": "2026-03-06T20:08:21.101411"
+  }
+]

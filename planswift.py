@@ -117,9 +117,9 @@ try {
     # Build a single PS script that queries every known section+item by name
     queries = []
     for sec_name, item_names in manifest.items():
-        safe_sec = sec_name.replace("'", "''")
+        safe_sec = sec_name.replace("'", "''").replace('"', '')
         for item_name in item_names:
-            safe_item = item_name.replace("'", "''")
+            safe_item = item_name.replace("'", "''").replace('"', '')
             path = f"\\Job\\Takeoff\\{safe_sec}\\{safe_item}"
             queries.append(
                 f"$item = $root.GetItem('{path}');"
@@ -299,9 +299,9 @@ try {{
 
 def ps_add_item(section: str, name: str, item_type: str = "Linear", unit: str = "LF") -> dict:
     """Add a takeoff item to a section. item_type: Linear, Area, Count, Assembly."""
-    safe_section = section.replace("'", "''")
-    safe_name = name.replace("'", "''")
-    safe_unit = unit.replace("'", "''")
+    safe_section = section.replace("'", "''").replace('"', '')
+    safe_name = name.replace("'", "''").replace('"', '')
+    safe_unit = unit.replace("'", "''").replace('"', '')
     path = f"\\Job\\Takeoff\\{section}\\{name}"
     script = f"""
 try {{

@@ -1,0 +1,16 @@
+{
+  "": {
+    "page_name": "",
+    "pixels_per_foot": 1.56,
+    "scale_bar_feet": 50,
+    "scale_bar_px": 78,
+    "image_width": 1926,
+    "image_height": 1206,
+    "view_type": "plan",
+    "sheet_title": "C03 - Utility Plan",
+    "confidence": "medium",
+    "notes": "The graphic scale bar is small and located in the upper right portion of the drawing near the north arrow. The plan sheet is 36x24 inches at 'Not to Scale' per header, but a graphic scale bar appears present. Pixel measurement is approximate due to image resolution and zoom level. The scale bar appears to show increments of 0, 25, 50 feet.",
+    "calibrated_at": "2026-03-07T19:06:04.205936",
+    "screenshot": "/mnt/c/Users/COREYT~1/AppData/Local/Temp/ps_screenshot.png"
+  }
+}

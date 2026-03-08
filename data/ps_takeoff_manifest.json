@@ -1,0 +1,24 @@
+{
+  "Storm Drainage": [
+    "18 RCP",
+    "24 RCP",
+    "Manhole",
+    "Inlet"
+  ],
+  "Water": [
+    "8 PVC C900",
+    "6 PVC C900",
+    "Fire Hydrant",
+    "Gate Valve 6-8in",
+    "DCVA Vault"
+  ],
+  "Sanitary Sewer": [
+    "4 PVC SDR26",
+    "6 PVC SDR26",
+    "Cleanout",
+    "SS Manhole 4-6ft"
+  ],
+  "Fire/FDC": [
+    "6 DI"
+  ]
+}

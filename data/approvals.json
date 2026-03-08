@@ -1,0 +1,144 @@
+[
+  {
+    "id": "appr-84e2f55b",
+    "type": "file_write",
+    "description": "Generate proposal: Staybridge Suites - Mansfield\nTotal bid: $356,587.00  |  Est. profit: $27,660 (7.8%)\nGC: T18 Construction\nSave to Desktop as PROPOSAL_Staybridge_Suites_-_Mansfield_...txt",
+    "payload": {
+      "path": "/mnt/c/Users/Corey Tigert/OneDrive/Desktop/PROPOSAL_Staybridge_Suites_-_Mansfield_20260307.txt",
+      "content": "STORMLINE UTILITIES, LLC\n(469) 732-1133  |  corey@stormlineutilities.com  |  stormlineutilities.com\n\nPROPOSAL\nDate:         March 07, 2026\nProject:      Staybridge Suites - Mansfield\nLocation:     Mansfield, TX (Tarrant County)\nSubmitted to: T18 Construction\n\n================================================================\nSCOPE OF WORK\n================================================================\nStormline Utilities, LLC proposes to furnish all labor,\nmaterials, and equipment for the underground utility work\ndescribed below, per the referenced plans and specifications.\n\n================================================================\nPRICE SUMMARY\n================================================================\n\n  Fire/FDC                                 $   22,000.00\n  Sanitary Sewer                           $   38,600.00\n  Storm Drainage                           $  132,600.00\n  Water                                    $   69,400.00\n  Mobilization                             $   10,504.00\n  Testing & Startup                        $    3,500.00\n  Sales Tax (8.25% materials)              $   10,832.00\n\n  ----------------------------------------------------------\n  TOTAL BASE BID                           $  356,587.00\n  ----------------------------------------------------------\n\n* Rock excavation, dewatering, and utility conflict resolution\n  are excluded and quoted as Additional Pricing if required.\n* Prevailing/Davis-Bacon wage does not apply unless stated.\n* Quote valid 30 days. Payment terms: Net 30.\n\n================================================================\nRespectfully submitted,\n\nCorey Tigert\nOwner, Stormline Utilities, LLC\n(469) 732-1133"
+    },
+    "status": "pending",
+    "created_at": "2026-03-07T19:35:47.734010"
+  },
+  {
+    "id": "appr-042f6c6c",
+    "type": "file_write",
+    "description": "Generate proposal: Staybridge Suites Mansfield\nTotal bid: $369,597.00  |  Est. profit: $28,669 (7.8%)\nGC: T18 Construction\nSave to Desktop as PROPOSAL_Staybridge_Suites_Mansfield_...txt",
+    "payload": {
+      "path": "/mnt/c/Users/Corey Tigert/OneDrive/Desktop/PROPOSAL_Staybridge_Suites_Mansfield_20260307.txt",
+      "content": "STORMLINE UTILITIES, LLC\n(469) 732-1133  |  corey@stormlineutilities.com  |  stormlineutilities.com\n\nPROPOSAL\nDate:         March 07, 2026\nProject:      Staybridge Suites Mansfield\nLocation:     Mansfield, TX\nSubmitted to: T18 Construction\n\n================================================================\nSCOPE OF WORK\n================================================================\nStormline Utilities, LLC proposes to furnish all labor,\nmaterials, and equipment for the underground utility work\ndescribed below, per the referenced plans and specifications.\n\n================================================================\nPRICE SUMMARY\n================================================================\n\n  Fire/FDC                                 $   22,000.00\n  Sanitary Sewer                           $   38,600.00\n  Storm Drainage                           $  142,300.00\n  Water                                    $   69,400.00\n  Mobilization                             $   10,892.00\n  Testing & Startup                        $    3,500.00\n  Sales Tax (8.25% materials)              $   11,232.00\n\n  ----------------------------------------------------------\n  TOTAL BASE BID                           $  369,597.00\n  ----------------------------------------------------------\n\n* Rock excavation, dewatering, and utility conflict resolution\n  are excluded and quoted as Additional Pricing if required.\n* Prevailing/Davis-Bacon wage does not apply unless stated.\n* Quote valid 30 days. Payment terms: Net 30.\n\n================================================================\nRespectfully submitted,\n\nCorey Tigert\nOwner, Stormline Utilities, LLC\n(469) 732-1133"
+    },
+    "status": "approved",
+    "created_at": "2026-03-07T19:42:22.035817",
+    "executed_at": "2026-03-07T19:44:38.404057",
+    "result": {
+      "success": true,
+      "message": "File written: /mnt/c/Users/Corey Tigert/OneDrive/Desktop/PROPOSAL_Staybridge_Suites_Mansfield_20260307.txt"
+    }
+  },
+  {
+    "id": "appr-191f003e",
+    "type": "proposal_docx",
+    "description": "Generate DOCX proposal: Staybridge Suites - Mansfield\nTotal bid: $356,587.00  |  Est. profit: $27,660 (7.8%)\nGC: T18 Construction\nSave to Desktop as PROPOSAL_Staybridge_Suites_-_Mansfield_...docx",
+    "payload": {
+      "estimate_data": {
+        "job_name": "Staybridge Suites - Mansfield",
+        "gc_name": "T18 Construction",
+        "job_type": "standard",
+        "oap_rate_pct": 25,
+        "line_items": [
+          {
+            "section": "Storm Drainage",
+            "item": "18 RCP",
+            "qty": 220.0,
+            "unit": "LF",
+            "unit_cost": 195.0,
+            "extension": 42900.0
+          },
+          {
+            "section": "Storm Drainage",
+            "item": "24 RCP",
+            "qty": 280.0,
+            "unit": "LF",
+            "unit_cost": 240.0,
+            "extension": 67200.0
+          },
+          {
+            "section": "Storm Drainage",
+            "item": "Manhole",
+            "qty": 2.0,
+            "unit": "EA",
+            "unit_cost": 8000.0,
+            "extension": 16000.0
+          },
+          {
+            "section": "Storm Drainage",
+            "item": "Inlet",
+            "qty": 1.0,
+            "unit": "EA",
+            "unit_cost": 6500.0,
+            "extension": 6500.0
+          },
+          {
+            "section": "Water",
+            "item": "8 PVC C900",
+            "qty": 320.0,
+            "unit": "LF",
+            "unit_cost": 155.0,
+            "extension": 49600.0
+          },
+          {
+            "section": "Water",
+            "item": "6 PVC C900",
+            "qty": 180.0,
+            "unit": "LF",
+            "unit_cost": 110.0,
+            "extension": 19800.0
+          },
+          {
+            "section": "Sanitary Sewer",
+            "item": "4 PVC SDR26",
+            "qty": 260.0,
+            "unit": "LF",
+            "unit_cost": 55.0,
+            "extension": 14300.0
+          },
+          {
+            "section": "Sanitary Sewer",
+            "item": "6 PVC SDR26",
+            "qty": 180.0,
+            "unit": "LF",
+            "unit_cost": 135.0,
+            "extension": 24300.0
+          },
+          {
+            "section": "Fire/FDC",
+            "item": "6 DI",
+            "qty": 200.0,
+            "unit": "LF",
+            "unit_cost": 110.0,
+            "extension": 22000.0
+          }
+        ],
+        "section_totals": {
+          "Storm Drainage": 132600.0,
+          "Water": 69400.0,
+          "Sanitary Sewer": 38600.0,
+          "Fire/FDC": 22000.0
+        },
+        "direct_cost": 262600.0,
+        "mobilization": 10504,
+        "testing": 3500,
+        "total_direct_cost": 276604.0,
+        "oap_amount": 69151,
+        "subtotal_with_oap": 345755.0,
+        "sales_tax": 10832,
+        "total_bid": 356587.0,
+        "estimated_profit": 27660,
+        "estimated_margin_pct": 7.8,
+        "unpriced_items": []
+      },
+      "project_address": "Mansfield, TX (Tarrant County)",
+      "scope_notes": "",
+      "out_path": "/mnt/c/Users/Corey Tigert/OneDrive/Desktop/PROPOSAL_Staybridge_Suites_-_Mansfield_20260307.docx"
+    },
+    "status": "approved",
+    "created_at": "2026-03-07T19:52:01.393865",
+    "executed_at": "2026-03-07T19:52:01.655714",
+    "result": {
+      "success": true,
+      "path": "/mnt/c/Users/Corey Tigert/OneDrive/Desktop/PROPOSAL_Staybridge_Suites_-_Mansfield_20260307.docx",
+      "total_bid": 356587.0
+    }
+  }
+]
