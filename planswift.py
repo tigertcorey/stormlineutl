@@ -270,12 +270,16 @@ def ps_add_section(name: str) -> dict:
     script = f"""
 try {{
     $ps = New-Object -ComObject PlanSwift9.PlanSwift
-    $existing = $ps.GetPropertyResultAsString('\\Job\\Takeoff\\{safe}', 'Name', '')
-    if ($existing -ne '') {{
-        Write-Output "EXISTS: \\Job\\Takeoff\\{safe}"
+    $root = $ps.Root()
+    $takeoff = $root.GetItem('\\Job\\Takeoff')
+    # Check if section already exists
+    $existing = $takeoff.GetItem('{safe}')
+    if ($existing) {{
+        Write-Output "EXISTS: $($existing.FullPath())"
     }} else {{
-        $item = $ps.AddItem('\\Job\\Takeoff', '{safe}', 'Section')
-        Write-Output "CREATED: \\Job\\Takeoff\\{safe}"
+        $sec = $takeoff.NewItemEx('', 'Section', '')
+        $sec.SetPropertyFormula('Name', '{safe}')
+        Write-Output "CREATED: $($sec.FullPath())"
     }}
     [System.Runtime.InteropServices.Marshal]::ReleaseComObject($ps) | Out-Null
 }} catch {{
@@ -287,7 +291,7 @@ try {{
         return {"success": False, "error": err}
     if "ERROR:" in out:
         return {"success": False, "error": out.split("ERROR:", 1)[1].strip()}
-    existed = out.startswith("EXISTS:")
+    existed = "EXISTS:" in out
     return {"success": True, "path": f"\\Job\\Takeoff\\{name}", "already_existed": existed}
 
 
@@ -300,9 +304,13 @@ def ps_add_item(section: str, name: str, item_type: str = "Linear", unit: str = 
     script = f"""
 try {{
     $ps = New-Object -ComObject PlanSwift9.PlanSwift
-    $item = $ps.AddItem('\\Job\\Takeoff\\{safe_section}', '{safe_name}', '{item_type}')
-    $ps.SetProperty('\\Job\\Takeoff\\{safe_section}\\{safe_name}', 'Unit', '{safe_unit}')
-    Write-Output "CREATED: \\Job\\Takeoff\\{safe_section}\\{safe_name}"
+    $root = $ps.Root()
+    $sec = $root.GetItem('\\Job\\Takeoff\\{safe_section}')
+    if (-not $sec) {{ Write-Output "ERROR: Section not found: {safe_section}"; exit 1 }}
+    $item = $sec.NewItemEx('', '{item_type}', '')
+    $item.SetPropertyFormula('Name', '{safe_name}')
+    $item.SetPropertyFormula('Unit', '{safe_unit}')
+    Write-Output "CREATED: $($item.FullPath())"
     [System.Runtime.InteropServices.Marshal]::ReleaseComObject($ps) | Out-Null
 }} catch {{
     Write-Output "ERROR: $($_.Exception.Message)"
@@ -317,14 +325,17 @@ try {{
 
 
 def ps_set_property(path: str, prop: str, value: str) -> dict:
-    """Set any property on a PlanSwift item (Quantity, Length, Unit, Description, etc.)."""
+    """Set any property on a PlanSwift item via SetPropertyFormula."""
     safe_path = path.replace("'", "''")
     safe_prop = prop.replace("'", "''")
     safe_val = value.replace("'", "''")
     script = f"""
 try {{
     $ps = New-Object -ComObject PlanSwift9.PlanSwift
-    $ps.SetProperty('{safe_path}', '{safe_prop}', '{safe_val}')
+    $root = $ps.Root()
+    $item = $root.GetItem('{safe_path}')
+    if (-not $item) {{ Write-Output "ERROR: Item not found: {safe_path}"; exit 1 }}
+    $item.SetPropertyFormula('{safe_prop}', '{safe_val}')
     Write-Output "SET: {safe_path} | {safe_prop} = {safe_val}"
     [System.Runtime.InteropServices.Marshal]::ReleaseComObject($ps) | Out-Null
 }} catch {{
@@ -345,7 +356,10 @@ def ps_delete_item(path: str) -> dict:
     script = f"""
 try {{
     $ps = New-Object -ComObject PlanSwift9.PlanSwift
-    $ps.DeleteItem('{safe_path}')
+    $root = $ps.Root()
+    $item = $root.GetItem('{safe_path}')
+    if (-not $item) {{ Write-Output "ERROR: Item not found: {safe_path}"; exit 1 }}
+    $item.Delete()
     Write-Output "DELETED: {safe_path}"
     [System.Runtime.InteropServices.Marshal]::ReleaseComObject($ps) | Out-Null
 }} catch {{
@@ -400,26 +414,32 @@ Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
 Add-Type @"
 using System;
-using System.Drawing;
 using System.Runtime.InteropServices;
 public class WinCapture {
+    [DllImport("user32.dll")] public static extern bool SetProcessDPIAware();
     [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr h, out RECT r);
     [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr h);
     [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr h, int cmd);
     public struct RECT { public int Left, Top, Right, Bottom; }
 }
 "@
+[WinCapture]::SetProcessDPIAware() | Out-Null
 $procs = Get-Process | Where-Object { $_.MainWindowTitle -like "*PlanSwift*" -or $_.ProcessName -like "*planswift*" }
 if ($procs.Count -eq 0) { Write-Output "ERROR: PlanSwift window not found"; exit 1 }
 $hwnd = $procs[0].MainWindowHandle
-[WinCapture]::ShowWindow($hwnd, 9) | Out-Null
+[WinCapture]::ShowWindow($hwnd, 3) | Out-Null
 [WinCapture]::SetForegroundWindow($hwnd) | Out-Null
-Start-Sleep -Milliseconds 400
+Start-Sleep -Milliseconds 1000
 $rect = New-Object WinCapture+RECT
 [WinCapture]::GetWindowRect($hwnd, [ref]$rect) | Out-Null
 $w = $rect.Right - $rect.Left
 $h = $rect.Bottom - $rect.Top
-if ($w -le 0 -or $h -le 0) { Write-Output "ERROR: Invalid window bounds"; exit 1 }
+if ($w -le 0 -or $h -le 0) {
+    $screen = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
+    $w = $screen.Width; $h = $screen.Height
+    $rect.Left = 0; $rect.Top = 0
+    Write-Output "WARN: Using full screen fallback"
+}
 $bmp = New-Object System.Drawing.Bitmap($w, $h)
 $gfx = [System.Drawing.Graphics]::FromImage($bmp)
 $gfx.CopyFromScreen($rect.Left, $rect.Top, 0, 0, $bmp.Size)

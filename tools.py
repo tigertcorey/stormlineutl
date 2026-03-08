@@ -209,7 +209,7 @@ def _ps_vision_analyze(image_path: str, prompt: str) -> str:
     client = anthropic.Anthropic(api_key=config.anthropic_api_key)
     msg = client.messages.create(
         model="claude-sonnet-4-6",
-        max_tokens=4096,
+        max_tokens=8192,
         messages=[{
             "role": "user",
             "content": [
@@ -335,47 +335,41 @@ def ps_analyze_pipes(**_) -> dict:
 {cal_info}
 Image size: {shot['width']} x {shot['height']} pixels.
 
-You are a professional underground utility takeoff estimator. Analyze this plan and identify ALL pipe runs visible.
+You are a professional underground utility takeoff estimator. Analyze this plan and identify ALL pipe runs and structures visible.
 
-For each pipe segment, return a JSON entry. Return a JSON object like this:
+Return ONLY a JSON object in this exact format — no markdown, no explanation:
 {{
-  "view_type": "plan or profile or detail",
-  "sheet_title": "<sheet title if visible>",
-  "scale_bar_visible": true/false,
-  "legend_found": true/false,
+  "view_type": "plan",
+  "sheet_title": "<title if visible>",
   "pipes": [
     {{
       "id": "pipe_001",
-      "size": "<e.g. 18-inch or 24-inch>",
-      "material": "<RCP, PVC SDR26, C900, DI, HDPE, etc.>",
-      "type": "<storm, sanitary, water, fire, FDC>",
-      "from_structure": "<manhole, inlet, headwall, etc. at start>",
-      "to_structure": "<structure at end>",
-      "path_points_relative": [[x1,y1],[x2,y2],...],  // 0.0-1.0 relative to image size, trace along pipe centerline
-      "pixel_length": <total pixel length of path>,
-      "estimated_lf": <pixel_length / pixels_per_foot if calibrated, else null>,
-      "size_label_visible": true/false,
-      "size_label_text": "<exact label text if visible>",
-      "confidence": "high/medium/low",
+      "type": "storm|sanitary|water|fire|FDC",
+      "size": "18",
+      "material": "RCP|PVC SDR26|C900|DI|HDPE",
+      "from_structure": "<start>",
+      "to_structure": "<end>",
+      "estimated_lf": <number>,
+      "size_label_text": "<label if visible>",
+      "confidence": "high|medium|low",
       "notes": "<slope, invert, special conditions>"
     }}
   ],
   "structures": [
     {{
       "id": "str_001",
-      "type": "<manhole, inlet, junction box, headwall, cleanout, hydrant, valve, etc.>",
-      "label": "<structure label/number if shown>",
-      "location_relative": [x, y],
-      "connects_to": ["pipe_001", "pipe_002"],
-      "confidence": "high/medium/low"
+      "type": "manhole|inlet|junction_box|headwall|cleanout|hydrant|valve",
+      "label": "<label if shown>",
+      "count": 1,
+      "confidence": "high|medium|low"
     }}
   ],
-  "flags": ["<anything uncertain or needing field verification>"],
-  "unidentified_lines": <count of lines that look like pipes but couldn't be identified>
+  "flags": ["<anything uncertain or needs field verification>"]
 }}
 
-Be thorough. Trace every visible pipe run. Use the full polyline path (multiple points) for curved or angled runs.
-Return ONLY the JSON, no other text."""
+Group identical pipe sizes/types into single entries with total estimated_lf.
+For estimated_lf: visually estimate pipe length using the scale bar, or use {cal.get('pixels_per_foot', 1.56):.2f} px/ft calibration.
+Return ONLY the JSON object."""
 
     try:
         raw = _ps_vision_analyze(shot["wsl_path"], prompt)
