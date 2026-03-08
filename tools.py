@@ -483,8 +483,17 @@ def ps_create_takeoff_from_analysis(analysis: dict, section_name: str = "", **_)
         stype = s.get("type", "unknown")
         struct_counts[stype] = struct_counts.get(stype, 0) + 1
 
+    _struct_type_map = {
+        "manhole": "storm", "inlet": "storm", "junction_box": "storm",
+        "catch_basin": "storm", "headwall": "storm",
+        "hydrant": "water", "fire_hydrant": "water",
+        "valve": "water", "gate_valve": "water",
+        "dcva": "water", "backflow": "water", "meter": "water", "service": "water",
+        "cleanout": "sanitary", "drop_mh": "sanitary",
+    }
+
     for stype, count in struct_counts.items():
-        ptype = "storm"  # default — improve with smarter detection if needed
+        ptype = _struct_type_map.get(stype.lower().replace(" ", "_"), "storm")
         sec = type_map.get(ptype, section_name or "Storm Drainage")
         r = ps_add_item(sec, stype.title(), "Count", "EA")
         if r["success"]:
@@ -651,7 +660,19 @@ def estimate_from_takeoff(job_name: str = "", gc_name: str = "",
             ("manhole", "inlet", "junction", "headwall", "hydrant",
              "valve", "cleanout", "service", "dcva", "backflow", "meter"))
 
-        unit_cost = _lookup_struct_rate(name, util_type) if is_struct else _lookup_pipe_rate(util_type, size, material)
+        # For structures, use section name to pick the right rate table
+        # (hydrant/valve in Water section → water rates, not storm)
+        if is_struct:
+            name_lower = name.lower()
+            if any(w in name_lower for w in ("hydrant", "valve", "dcva", "backflow", "meter", "service")) and util_type == "storm":
+                struct_util = "water"
+            elif any(w in name_lower for w in ("cleanout", "drop_mh")) and util_type == "storm":
+                struct_util = "sewer"
+            else:
+                struct_util = util_type
+            unit_cost = _lookup_struct_rate(name, struct_util)
+        else:
+            unit_cost = _lookup_pipe_rate(util_type, size, material)
         extension = round(qty * unit_cost, 2)
 
         line_items.append({
