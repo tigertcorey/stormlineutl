@@ -102,12 +102,14 @@ def _fill_section(table, tbl_idx: int, items: list, subtotal: float):
             li = items[slot]
             qty = li.get("qty", 0)
             qty_str = f"{int(qty):,}" if qty == int(qty) else f"{qty:,.1f}"
+            unit_cost = li.get("unit_cost", 0)
+            extension = li.get("extension", 0)
             _set_cell(row.cells[0], str(slot + 1))
             _set_cell(row.cells[1], li.get("item", ""))
             _set_cell(row.cells[2], li.get("unit", "LF"))
             _set_cell(row.cells[3], qty_str)
-            _set_cell(row.cells[4], "")   # no unit price to GC
-            _set_cell(row.cells[5], "")   # no line totals to GC
+            _set_cell(row.cells[4], f"${unit_cost:,.2f}")
+            _set_cell(row.cells[5], f"${extension:,.2f}")
         else:
             for c in row.cells:
                 _set_cell(c, "")
