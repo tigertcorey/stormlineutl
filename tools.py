@@ -533,32 +533,38 @@ PRICING_DB = {
     },
     "storm_struct": {  # $/EA
         "inlet": 6500, "curb_inlet": 6500, "area_inlet": 6000,
-        "junction_box": 7500, "catch_basin": 6000,
+        "catch_basin": 6500, "modified_square": 7500, "junction_box": 7500,
         "manhole": 8000, "headwall": 9000,
+        "detention": 25000, "concrete_flume": 3500,
+        "riprap": 85,          # $/SY or LF — placeholder
+        "connect": 2500,       # connect to existing storm
+        "remove": 1500,        # demo/remove items
     },
     "water_pipe": {  # $/LF
         "2": 55, "3": 65, "4": 85, "6": 110, "8": 155, "12": 210,
     },
     "water_struct": {  # $/EA
-        "gate_valve": 1200, "valve": 1200,
-        "gate_valve_12": 2500,
-        "fire_hydrant": 8500, "hydrant": 8500,
-        "dcva": 14000, "backflow": 14000,
-        "tapping_sleeve": 5500,
-        "service": 1800,
-        "meter": 1800,
+        "gate_valve": 1200, "valve": 1200, "gate_valve_12": 2500,
+        "fire_hydrant": 8500, "hydrant": 8500, "assembly": 8500,
+        "dcva": 14000, "dcbp": 14000, "backflow": 14000, "vault": 14000,
+        "tapping_sleeve": 5500, "tapping": 5500, "sleeve": 5500,
+        "service": 1800, "meter": 1800,
+        "tee": 850, "reducer": 650, "bend": 450, "elbow": 450,
+        "fdc": 3500,
     },
     "sewer_pipe": {  # $/LF
         "4": 55, "6": 135, "8": 175, "10": 210,
     },
     "sewer_struct": {  # $/EA
-        "manhole": 7500, "drop_mh": 11000,
-        "connect_existing": 5000,
-        "cleanout": 750,
-        "service": 1200,
+        "manhole": 7500, "ssmh": 7500, "drop_mh": 11000,
+        "connect": 3500, "adjust": 1200,
+        "cleanout": 750, "service": 1200,
     },
-    "fire_pipe": {  # $/LF — DI, same general range as water
+    "fire_pipe": {  # $/LF — DI
         "4": 85, "6": 110, "8": 155,
+    },
+    "fire_struct": {  # $/EA
+        "fdc": 3500, "assembly": 3500, "valve": 1200, "vault": 3500,
     },
 }
 
@@ -593,18 +599,33 @@ def _lookup_pipe_rate(util_type: str, size: str, material: str = "") -> float:
 
 
 def _lookup_struct_rate(name: str, util_type: str = "storm") -> float:
-    t = name.lower().replace(" ", "_").replace("-", "_")
-    if util_type in ("water", "fire", "fdc"):
+    n = name.lower()
+
+    # Action-word overrides (check before structure-type matching to avoid false positives)
+    if "tapping sleeve" in n:
+        return 5500.0
+    if "remove" in n or "demo" in n:
+        return 1500.0
+    if "connect" in n:
+        return 3500.0 if util_type in ("sewer", "sanitary") else 2500.0
+    if "adjust" in n:
+        return 1200.0
+
+    t = n.replace(" ", "_").replace("-", "_")
+    if util_type == "fire":
+        db = PRICING_DB["fire_struct"]
+    elif util_type == "water":
         db = PRICING_DB["water_struct"]
     elif util_type in ("sanitary", "sewer"):
         db = PRICING_DB["sewer_struct"]
     else:
         db = PRICING_DB["storm_struct"]
+
     if t in db:
         return float(db[t])
-    for key in db:
-        if key in t or t.startswith(key[:4]):
-            return float(db[key])
+    for key, rate in db.items():
+        if key in t or key in n:
+            return float(rate)
     return 0.0
 
 
@@ -640,37 +661,38 @@ def estimate_from_takeoff(job_name: str = "", gc_name: str = "",
             continue
 
         sec_lower = section.lower()
+        name_lower = name.lower()
+        # Section routing — handles both old names and real PlanSwift names
         if any(w in sec_lower for w in ("storm", "drain")):
             util_type = "storm"
-        elif "water" in sec_lower:
-            util_type = "water"
         elif any(w in sec_lower for w in ("sanitary", "sewer")):
             util_type = "sewer"
+        elif "water fire" in sec_lower or "water" in sec_lower:
+            # 1 - WATER FIRE: item name determines water vs fire
+            if any(w in name_lower for w in ("fire line", "fdc", "dip fire")):
+                util_type = "fire"
+            else:
+                util_type = "water"
         elif any(w in sec_lower for w in ("fire", "fdc")):
             util_type = "fire"
+        elif "general" in sec_lower:
+            continue   # mob/testing handled separately below
         else:
             util_type = "storm"
 
         size_m = re.search(r'(\d+)', name)
         size = size_m.group(1) if size_m else "0"
-        material = next((m for m in ("RCP", "C900", "SDR26", "SDR-26", "HDPE", "DI", "PVC")
+        material = next((m for m in ("RCP", "C900", "SDR26", "SDR-26", "HDPE", "DIP", "DI", "PVC")
                          if m.lower() in name.lower()), "")
 
-        is_struct = unit == "EA" or any(w in name.lower() for w in
-            ("manhole", "inlet", "junction", "headwall", "hydrant",
-             "valve", "cleanout", "service", "dcva", "backflow", "meter"))
+        is_struct = unit == "EA" or any(w in name_lower for w in (
+            "manhole", " mh", "ssmh", "inlet", "junction", "headwall", "hydrant", "assembly",
+            "valve", "cleanout", "service", "dcva", "dcbp", "backflow", "meter",
+            "tee", "reducer", "bend", "sleeve", "fdc", "flume", "riprap",
+            "connect to", "adjust", "remove", "detention", "vault"))
 
-        # For structures, use section name to pick the right rate table
-        # (hydrant/valve in Water section → water rates, not storm)
         if is_struct:
-            name_lower = name.lower()
-            if any(w in name_lower for w in ("hydrant", "valve", "dcva", "backflow", "meter", "service")) and util_type == "storm":
-                struct_util = "water"
-            elif any(w in name_lower for w in ("cleanout", "drop_mh")) and util_type == "storm":
-                struct_util = "sewer"
-            else:
-                struct_util = util_type
-            unit_cost = _lookup_struct_rate(name, struct_util)
+            unit_cost = _lookup_struct_rate(name, util_type)
         else:
             unit_cost = _lookup_pipe_rate(util_type, size, material)
         extension = round(qty * unit_cost, 2)

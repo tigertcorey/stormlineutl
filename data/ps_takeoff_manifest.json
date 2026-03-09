@@ -1,24 +1,43 @@
 {
-  "Storm Drainage": [
-    "18 RCP",
-    "24 RCP",
-    "Manhole",
-    "Inlet"
+  "1 - WATER FIRE": [
+    "8in DIP Water Main",
+    "6in DIP Fire Line",
+    "Fire Hydrant Assembly",
+    "6in Gate Valve and Box",
+    "8in Gate Valve and Box",
+    "DCBP Vault",
+    "FDC Assembly",
+    "Tapping Sleeve and Valve",
+    "1in Water Meter",
+    "8x6 Tee",
+    "8x8 Tee",
+    "8x10 Reducer",
+    "22.5 Degree Bend 8in",
+    "30 Degree Bend 8in",
+    "45 Degree Bend 8in"
   ],
-  "Water": [
-    "8 PVC C900",
-    "6 PVC C900",
-    "Fire Hydrant",
-    "Gate Valve 6-8in",
-    "DCVA Vault"
-  ],
-  "Sanitary Sewer": [
-    "4 PVC SDR26",
-    "6 PVC SDR26",
+  "2 - SANITARY SEWER": [
+    "8in SDR-26 PVC SS Public",
+    "8in SDR-26 PVC SS Private",
+    "4ft SSMH New",
     "Cleanout",
-    "SS Manhole 4-6ft"
+    "Connect to EX SSMH",
+    "Adjust EX MH Rim"
   ],
-  "Fire/FDC": [
-    "6 DI"
+  "3 - STORM DRAIN": [
+    "18in RCP Storm",
+    "15in RCP Storm",
+    "12in HDPE Storm",
+    "Catch Basin Curb Inlet",
+    "4ft Modified Square MH",
+    "UG Detention System",
+    "Concrete Flume",
+    "Rock Riprap 6in",
+    "Connect to EX Storm",
+    "Remove EX Headwall"
+  ],
+  "4 - GENERAL CONDITIONS": [
+    "Mobilization",
+    "Testing Chlorination TV"
   ]
 }

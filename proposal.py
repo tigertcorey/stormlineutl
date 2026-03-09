@@ -17,36 +17,38 @@ PROJECTS_DIR = "/mnt/c/Users/Corey Tigert/OneDrive/Desktop/PROJECTS"
 SECTION_TABLE = {"storm": 1, "water": 2, "sanitary": 3, "sewer": 3, "fire": 4, "fdc": 4}
 DATA_ROW_START = {1: 1, 2: 1, 3: 1, 4: 0}   # table 4 has no header row
 
-# Item-name keywords that override section-based routing
-_ITEM_WATER    = ("hydrant", "valve", "gate valve", "dcva", "backflow", "meter", "service tap",
-                  "fire hydrant", "detector check", "rpz", "tapping sleeve")
-_ITEM_SEWER    = ("cleanout", "drop mh", "connect to existing mh", "service connection")
-_ITEM_FIRE     = ("fire line", "fdc", "fire service", "detector check valve", "6 di", "8 di")
-_ITEM_STORM    = ("rcp", "hdpe storm", "curb inlet", "area inlet", "junction box",
-                  "catch basin", "storm mh", "headwall")
-
-
 def _classify_item(item_name: str, section_name: str) -> str:
-    """Return utility group based on item name + section, most specific wins."""
+    """Return utility group (storm/water/sanitary/fire) based on item name + section."""
     n = item_name.lower()
     s = section_name.lower()
 
-    if any(k in n for k in _ITEM_FIRE):
+    # Fire items — check before water since DIP fire line would also match water
+    if any(k in n for k in ("dip fire", "fire line", "fdc assembly", "fdc")):
         return "fire"
-    if any(k in n for k in _ITEM_WATER):
+    # Water items
+    if any(k in n for k in ("dip water", "c900", "pvc water", "hydrant", "gate valve",
+                             "dcva", "dcbp", "backflow", "water meter", "tapping sleeve",
+                             "tapping", "tee", "reducer", "bend", "elbow", "rpz")):
         return "water"
-    if any(k in n for k in _ITEM_SEWER):
+    # Sewer items
+    if any(k in n for k in ("sdr-26", "sdr26", "ssmh", "sanitary", "cleanout",
+                             "connect to ex ssmh", "adjust ex mh")):
         return "sanitary"
-    if any(k in n for k in _ITEM_STORM):
+    # Storm items
+    if any(k in n for k in ("rcp storm", "hdpe storm", "rcp", "hdpe", "catch basin",
+                             "curb inlet", "square mh", "detention", "flume", "riprap",
+                             "connect to ex storm", "remove ex headwall")):
         return "storm"
 
     # Fall back to section label
+    if "water fire" in s or "water" in s:
+        return "water"
     if any(w in s for w in ("fire", "fdc")):
         return "fire"
-    if "water" in s:
-        return "water"
     if any(w in s for w in ("sanitary", "sewer")):
         return "sanitary"
+    if any(w in s for w in ("storm", "drain")):
+        return "storm"
     return "storm"
 
 
@@ -102,14 +104,12 @@ def _fill_section(table, tbl_idx: int, items: list, subtotal: float):
             li = items[slot]
             qty = li.get("qty", 0)
             qty_str = f"{int(qty):,}" if qty == int(qty) else f"{qty:,.1f}"
-            unit_cost = li.get("unit_cost", 0)
-            extension = li.get("extension", 0)
             _set_cell(row.cells[0], str(slot + 1))
             _set_cell(row.cells[1], li.get("item", ""))
             _set_cell(row.cells[2], li.get("unit", "LF"))
             _set_cell(row.cells[3], qty_str)
-            _set_cell(row.cells[4], f"${unit_cost:,.2f}")
-            _set_cell(row.cells[5], f"${extension:,.2f}")
+            _set_cell(row.cells[4], "")
+            _set_cell(row.cells[5], "")
         else:
             for c in row.cells:
                 _set_cell(c, "")
