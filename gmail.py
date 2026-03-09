@@ -177,12 +177,31 @@ def list_emails(max_results: int = 20, query: str = "") -> list[dict]:
     return emails
 
 
-def send_email(to: str, subject: str, body: str) -> dict:
+def send_email(to: str, subject: str, body: str, attachment_path: str = "") -> dict:
     """Actually send an email via Gmail. Should only be called after approval."""
+    import mimetypes
+    from email.mime.multipart import MIMEMultipart
+    from email.mime.base import MIMEBase
+    from email import encoders
+
     creds = _load_creds()
     service = build("gmail", "v1", credentials=creds, cache_discovery=False)
 
-    msg = MIMEText(body)
+    if attachment_path and os.path.exists(attachment_path):
+        msg = MIMEMultipart()
+        msg.attach(MIMEText(body))
+        ctype, _ = mimetypes.guess_type(attachment_path)
+        maintype, subtype = (ctype or "application/octet-stream").split("/", 1)
+        with open(attachment_path, "rb") as f:
+            att = MIMEBase(maintype, subtype)
+            att.set_payload(f.read())
+        encoders.encode_base64(att)
+        att.add_header("Content-Disposition", "attachment",
+                       filename=os.path.basename(attachment_path))
+        msg.attach(att)
+    else:
+        msg = MIMEText(body)
+
     msg["to"] = to
     msg["subject"] = subject
 

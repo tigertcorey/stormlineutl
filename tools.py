@@ -652,7 +652,13 @@ def estimate_from_takeoff(job_name: str = "", gc_name: str = "",
     for item in items:
         section = item.get("section", "General")
         name = item.get("item", "")
-        unit = item.get("unit", "LF").upper()
+        raw_unit = item.get("unit", "LF")
+        # PlanSwift UnitType formula sometimes returns an error string — derive unit from item type
+        if not raw_unit or "error" in raw_unit.lower() or "unknown" in raw_unit.lower():
+            item_type = item.get("type", "Linear")
+            unit = "LF" if item_type == "Linear" else "EA"
+        else:
+            unit = raw_unit.upper()
         try:
             qty = float(item.get("quantity") or item.get("length") or 0)
         except (ValueError, TypeError):
@@ -692,8 +698,10 @@ def estimate_from_takeoff(job_name: str = "", gc_name: str = "",
             "connect to", "adjust", "remove", "detention", "vault"))
 
         if is_struct:
+            unit = "EA"   # override — structures are always counted, not measured
             unit_cost = _lookup_struct_rate(name, util_type)
         else:
+            unit = "LF"
             unit_cost = _lookup_pipe_rate(util_type, size, material)
         extension = round(qty * unit_cost, 2)
 
