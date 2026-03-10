@@ -85,7 +85,8 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not _is_authorized(update): return await _deny(update)
-    await update.message.chat.send_action("typing")
+    stop_typing = asyncio.Event()
+    typing_task = asyncio.create_task(_keep_typing(update.message.chat, stop_typing))
     response = await agent.respond(
         update.effective_user.id,
         "Give me a quick ops status. Check three things and summarize concisely:\n"
@@ -94,6 +95,8 @@ async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "3. Pending approvals — anything waiting on me\n"
         "Keep it tight. Flag anything urgent."
     )
+    stop_typing.set()
+    await typing_task
     await send_long(update, response)
 
 
@@ -122,22 +125,28 @@ async def projects_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def email_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not _is_authorized(update): return await _deny(update)
     query = ' '.join(context.args) if context.args else ''
-    await update.message.chat.send_action("typing")
-    prompt = f"Check my Gmail and summarize what's important. Focus on bid invites, supplier quotes, plan deliveries, and GC communications. Skip noise."
+    prompt = "Check my Gmail and summarize what's important. Focus on bid invites, supplier quotes, plan deliveries, and GC communications. Skip noise."
     if query:
         prompt = f"Check my Gmail for: {query}. Summarize what you find."
+    stop_typing = asyncio.Event()
+    typing_task = asyncio.create_task(_keep_typing(update.message.chat, stop_typing))
     response = await agent.respond(update.effective_user.id, prompt)
+    stop_typing.set()
+    await typing_task
     await send_long(update, response)
 
 
 async def website_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not _is_authorized(update): return await _deny(update)
-    await update.message.chat.send_action("typing")
+    stop_typing = asyncio.Event()
+    typing_task = asyncio.create_task(_keep_typing(update.message.chat, stop_typing))
     response = await agent.respond(
         update.effective_user.id,
         "Read the website hero section and services section and summarize what the website currently says. "
         "Then tell me what sections are available to update."
     )
+    stop_typing.set()
+    await typing_task
     await send_long(update, response)
 
 
@@ -194,6 +203,16 @@ async def approval_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # ─── Message handler ──────────────────────────────────────────────────────────
 
+async def _keep_typing(chat, stop_event: asyncio.Event):
+    """Keep sending typing action every 4s until stop_event is set."""
+    while not stop_event.is_set():
+        try:
+            await chat.send_action("typing")
+        except Exception:
+            pass
+        await asyncio.sleep(4)
+
+
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_message = update.message.text
     if not user_message:
@@ -201,12 +220,18 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if not _is_authorized(update): return await _deny(update)
     logger.info(f"Message from chat_id={update.effective_chat.id} user={update.effective_user.username}")
-    await update.message.chat.send_action("typing")
+
+    stop_typing = asyncio.Event()
+    typing_task = asyncio.create_task(_keep_typing(update.message.chat, stop_typing))
 
     try:
         response = await agent.respond(update.effective_user.id, user_message)
+        stop_typing.set()
+        await typing_task
         await send_long(update, response)
     except Exception as e:
+        stop_typing.set()
+        await typing_task
         logger.error(f"Message handler error: {e}")
         await update.message.reply_text("Something went wrong. Please try again.")
 
@@ -224,7 +249,15 @@ async def error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 def main():
     logger.info("Starting Stormline Management Bot...")
 
-    app = Application.builder().token(config.telegram_token).build()
+    app = (
+        Application.builder()
+        .token(config.telegram_token)
+        .read_timeout(60)
+        .write_timeout(60)
+        .connect_timeout(30)
+        .pool_timeout(60)
+        .build()
+    )
 
     app.add_handler(CommandHandler("start", start_command))
     app.add_handler(CommandHandler("help", help_command))
